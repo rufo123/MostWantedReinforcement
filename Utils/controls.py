@@ -1,8 +1,9 @@
 import ctypes
+import threading
 import time
 
 
-class Controls:
+class Controls():
 
     UP_KEY: int = 0xC8
     LEFT_KEY: int = 0XCB
@@ -10,7 +11,9 @@ class Controls:
     DOWN_KEY: int = 0xD0
     HAND_BRAKE: int = 0x39
 
-    def __init__(self):
+    ENTER: int = 0x1C
+
+    def __init__(self,):
         pass
 
     def PressKey(self, par_hex_key_code: int) -> None:
@@ -27,11 +30,19 @@ class Controls:
         x = Input(ctypes.c_ulong(1), ii_)
         ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
-    def PressAndReleaseKey(self, par_hex_key_code: int) -> None:
+    def PressAndReleaseKey(self, par_hex_key_code: int, par_sleep_time: int = 1) -> None:
         self.PressKey(par_hex_key_code)
-        time.sleep(1)
+        time.sleep(par_sleep_time)
         self.ReleaseKey(par_hex_key_code)
-        time.sleep(1)
+        time.sleep(par_sleep_time)
+
+    def PressAndReleaseTwoKeys(self, par_hex_key_code_first: int, par_hex_key_code_second: int, par_sleep_time: int = 1):
+        self.PressKey(par_hex_key_code_first)
+        self.PressKey(par_hex_key_code_second)
+        time.sleep(par_sleep_time)
+        self.ReleaseKey(par_hex_key_code_first)
+        self.ReleaseKey(par_hex_key_code_second)
+        time.sleep(par_sleep_time)
 
     def Forward(self):
         self.PressAndReleaseKey(self.UP_KEY)
@@ -44,6 +55,18 @@ class Controls:
 
     def Right(self):
         self.PressAndReleaseKey(self.RIGHT_KEY)
+
+    def ForwardRight(self):
+        self.PressAndReleaseTwoKeys(self.UP_KEY, self.RIGHT_KEY)
+
+    def ForwardLeft(self):
+        self.PressAndReleaseTwoKeys(self.UP_KEY, self.LEFT_KEY)
+
+    def BackwardLeft(self):
+        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.LEFT_KEY)
+
+    def BackwardRight(self):
+        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.RIGHT_KEY)
 
     def HandBrake(self):
         self.PressAndReleaseKey(self.HAND_BRAKE)

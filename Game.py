@@ -13,6 +13,7 @@ import win32ui
 import win32con
 import numpy as np
 from numpy import ndarray
+from win32api import Sleep
 
 from GPS import GPS
 from LapProgress import LapProgress
@@ -56,14 +57,18 @@ class Game:
 
     a_controls: Controls
 
+    a_speed: int
 
+    a_car_offset: float
 
-    def __init__(self):
-        pass
+    a_race_initialised: bool
+
+    def __init__(self) -> None:
+        self.a_race_initialised = False
 
     def main_loop(self):
 
-
+        self.a_speed = 1
 
         self.a_list_bitmap = []
 
@@ -71,6 +76,10 @@ class Game:
 
         self.start_game()
         # self.start_cheat_engine()
+
+        while not self.process_exists("speed.exe"):
+            print("Waiting for Game to Start")
+            time.sleep(1)
 
         self.a_speedometer = Speedometer()
 
@@ -83,13 +92,25 @@ class Game:
         tmp_grayscale: None
 
         self.start_cheat_engine()
-        self.set_speed(1)
+        self.set_speed(self.a_speed)
 
         self.a_is_recording = False
 
         tmp_frame_counter: int = 0
 
         tmp_start_time: float = time.time()
+
+        tmp_speed_constant = 1 / self.a_speed
+
+        self.focus_on_game()
+
+        time.sleep(5)
+
+        self.init_game_race(0.7, 0.1)
+
+        time.sleep(3)
+
+        self.a_race_initialised = True
 
         while True:
 
@@ -120,15 +141,17 @@ class Game:
             cv2.imshow('Main DKO', tmp_grayscale)
 
             # tmp_gps_mask_lines = cv2.inRange(tmp_gps_hsv, np.array([0, 0, 87]), np.array([179, 136, 123]))
-            tmp_gps_mask_lines = cv2.inRange(tmp_gps_hsv, np.array([0, 0, 174]), np.array([179, 10, 255]))
+            tmp_gps_greyscale = cv2.inRange(tmp_gps_hsv, np.array([0, 0, 174]), np.array([179, 10, 255]))
 
-            tmp_contour = self.a_gps.make_gps_contour(tmp_gps_mask_lines, self.a_screenshot, tmp_gps_center)
+            tmp_contour = self.a_gps.make_gps_contour(tmp_gps_greyscale, self.a_screenshot, tmp_gps_center)
 
             tmp_speed_mph = self.a_speedometer.return_speed_mph()
 
             tmp_car_pos = self.a_gps.get_car_point(self.a_screenshot, tmp_gps_center)
 
             tmp_car_offset = self.a_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
+
+            self.a_car_offset = tmp_car_offset
 
             tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
 
@@ -173,14 +196,24 @@ class Game:
 
             cv2.imshow('Main Vision', self.a_screenshot)
 
-            tmp_frame_counter += 1
+            tmp_frame_counter += tmp_speed_constant
 
-            if (time.time() - tmp_start_time) > 1:
+            if (time.time() - tmp_start_time) > tmp_speed_constant:
                 print("FPS: ", tmp_frame_counter / (time.time() - tmp_start_time))
                 tmp_frame_counter = 0
                 tmp_start_time = time.time()
 
+    def is_race_initialised(self) -> bool:
+        return self.a_race_initialised
 
+    def get_lap_progress(self) -> float:
+        return self.a_lap_progress.return_lap_completed_percent()
+
+    def get_car_offset(self) -> float:
+        return self.a_car_offset
+
+    def get_speed_mph(self) -> float:
+        return self.a_speedometer.return_speed_mph()
 
     def make_grayscale(self, par_image):
         grayscale = cv2.cvtColor(par_image, cv2.COLOR_BGR2GRAY)
@@ -233,14 +266,12 @@ class Game:
         cDC.SelectObject(dataBitMap)
         cDC.BitBlt((0, 0), (w, h), dcObj, (x_cropped, y_cropped), win32con.SRCCOPY)
 
-        if self.a_is_recording:
-            self.record(dataBitMap, self.a_is_recording)
-
         # Save Screen
         # dataBitMap.SaveBitmapFile(cDC, bmpfilenamename)
 
         signedIntsArray = dataBitMap.GetBitmapBits(True)
         img = np.fromstring(signedIntsArray, dtype='uint8')
+
         img.shape = (h, w, 4)
 
         # Free Resources
@@ -251,6 +282,15 @@ class Game:
 
         img = img[..., :3]
         img = np.ascontiguousarray(img)
+
+        if self.a_is_recording:
+            self.record(img, self.a_is_recording)
+
+        try:
+            win32gui.SetForegroundWindow(hwnd)
+        except win32gui.error as e:
+            print("An error occurred while setting the foreground window (Probably Debugging): ", e)
+
 
         return img, w, h, rect
 
@@ -281,19 +321,35 @@ class Game:
         print('Game From File: ' + self.a_filename + ' cannot be started')
         return
 
-    def save_image(self, par_rect_window: any, par_filename: str):
-        img = ImageGrab.grab(par_rect_window)
-        img.save(par_filename + ".png")
+    def process_exists(self, par_process_name: string) -> bool:
+        call = 'TASKLIST', '/FI', 'imagename eq %s' % par_process_name
+        # use buildin check_output right away
+        output = subprocess.check_output(call).decode()
+        # check in last line for process name
+        last_line = output.strip().split('\r\n')[-1]
+        # because Fail message could be translated
+        return last_line.lower().startswith(par_process_name.lower())
 
     def capture_race(self, par_lap_progress: float, par_game_speed: int, par_rect: any):
         if par_lap_progress is not None:
             self.save_image(par_rect, "record/" + str(par_game_speed) + "/" + str(par_lap_progress))
 
-    def start_cheat_engine(self):
-        app = pywinauto.Application().connect(title="Cheat Engine 7.4", found_index=1)
+    def start_cheat_engine(self) -> None:
+        app = None
 
-        if app is None:
+        process_is_running = True
+        try:
+            app = pywinauto.Application().connect(title="Cheat Engine 7.4", found_index=1)
+        except pywinauto.application.ProcessNotFoundError:
+            process_is_running = False
+        except pywinauto.findwindows.ElementNotFoundError:
+            process_is_running = False
+
+        if not process_is_running:
             app = pywinauto.Application().start('C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64-SSE4-AVX2.exe')
+
+        window = app.window(title="Cheat Engine 7.4", found_index=0)
+        window.set_focus()
 
         text_boxes = []
         controls = []
@@ -377,9 +433,105 @@ class Game:
             self.a_controls.PressKey(self.a_controls.UP_KEY)
         elif recording:
             self.a_controls.ReleaseKey(self.a_controls.UP_KEY)
+            self.save_image()
 
+    def save_image(self):
+        for i in range(len(self.a_list_bitmap)):
+            img = Image.fromarray(self.a_list_bitmap[i])
+            img.save("record/" + str(self.get_game_speed()) + "/" + str(i) + ".png")
+        self.a_is_recording = False
+        self.a_list_bitmap = []
 
+    def focus_on_game(self) -> None:
+        hwnd = win32gui.FindWindow(None, 'Need for Speed™ Most Wanted')
+        win32gui.SetForegroundWindow(hwnd)
 
+    def init_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
 
+        try:
+            self.get_speed_mph()
+        except Exception as e:
+            print("Race Not Yet Initialised")
+        else:
+            print("Race Already Initialised")
+            return
 
+        # First Press To Go to Menu
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
 
+        # Accept Prompt
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Now We are in the Main Menu
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Now the selection will be on Challenge Series
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Now the selection will be on Quick Race
+
+        # Quick Race Menu
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        time.sleep(par_sleep_time_delay)
+        # Now the selection will be on Custom Race
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        # Custom Race Mode Select
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        time.sleep(par_sleep_time_delay)
+        # Now the selection will be on Sprint
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        # Sprint Track Select
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        time.sleep(par_sleep_time_delay)
+
+        # Sprint Options
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Traffic Level - None
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Set Opponents to None
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Set Difficulty to Easy
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Catch Up Off
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        # Accept
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        time.sleep(par_sleep_time_delay)
+        # Set Car
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Transmission Auto
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        # Should Wait One Second to Start the Race
+        time.sleep(par_sleep_time_delay * 5)
+        # Press Enter To Speed Up The Starting
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
