@@ -14,11 +14,13 @@ class LapProgress:
     offsets = [0x3C]
 
     def __init__(self):
-        self.mem = Pymem("speed.exe")
-        self.module = module_from_name(self.mem.process_handle, "speed.exe").lpBaseOfDll
         self.lock = Lock()
         self.shared_lap_progress = Value('i', 0)
         pass
+
+    def construct(self):
+        self.mem = Pymem("speed.exe")
+        self.module = module_from_name(self.mem.process_handle, "speed.exe").lpBaseOfDll
 
     def return_lap_completed_percent(self):
         self.lock.acquire()

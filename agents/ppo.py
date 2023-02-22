@@ -1,7 +1,10 @@
+import re
+
 import numpy as np
 import torch
 import torch.nn.functional as F
 import graph.make_graph
+import warnings
 from torch.multiprocessing import Process, Pipe
 from Utils.stats import MovingAverageScore, write_to_file
 
@@ -9,6 +12,8 @@ from Utils.stats import MovingAverageScore, write_to_file
 methods support_to_scalar and scalar_to_support are implemented
 by Davaud Werner in https://github.com/werner-duvaud/muzero-general
 '''
+
+
 def support_to_scalar(logits, support_size):
     """
     Transform a categorical representation to a scalar
@@ -18,17 +23,17 @@ def support_to_scalar(logits, support_size):
     probabilities = torch.softmax(logits, dim=1)
     support = (
         torch.tensor([x for x in range(-support_size, support_size + 1)])
-        .expand(probabilities.shape)
-        .float()
-        .to(device=probabilities.device)
+            .expand(probabilities.shape)
+            .float()
+            .to(device=probabilities.device)
     )
     x = torch.sum(support * probabilities, dim=1, keepdim=True)
 
     # Invert the scaling (defined in https://arxiv.org/abs/1805.11593)
     x = torch.sign(x) * (
-        ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x) + 1 + 0.001)) - 1) / (2 * 0.001))
-        ** 2
-        - 1
+            ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x) + 1 + 0.001)) - 1) / (2 * 0.001))
+            ** 2
+            - 1
     )
     return x
 
@@ -54,15 +59,15 @@ def scalar_to_support(x, support_size):
     logits.scatter_(2, indexes.long().unsqueeze(-1), prob.unsqueeze(-1))
     return logits
 
-def worker(connection, env_params, env_func, count_of_iterations, count_of_envs,
-           count_of_steps, gamma, gae_lambda):
 
-    envs = [env_func(env_params) for _ in range(count_of_envs)]
+def worker(connection, env_param1, env_param2, env_param3, env_func, count_of_iterations, count_of_envs,
+           count_of_steps, gamma, gae_lambda):
+    envs = [env_func(env_param1, env_param2, env_param3) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
 
     mem_log_probs = torch.zeros((count_of_steps, count_of_envs, 1))
-    mem_actions = torch.zeros((count_of_steps, count_of_envs, 1), dtype = torch.long)
+    mem_actions = torch.zeros((count_of_steps, count_of_envs, 1), dtype=torch.long)
     mem_values = torch.zeros((count_of_steps + 1, count_of_envs, 1))
     mem_rewards = torch.zeros((count_of_steps, count_of_envs, 1))
 
@@ -72,14 +77,13 @@ def worker(connection, env_params, env_func, count_of_iterations, count_of_envs,
         for step in range(count_of_steps):
             connection.send(observations.float())
             logits, values = connection.recv()
-            probs = F.softmax(logits, dim = -1)
-            actions = probs.multinomial(num_samples = 1)
-            log_probs = F.log_softmax(logits, dim = -1).gather(1, actions)
+            probs = F.softmax(logits, dim=-1)
+            actions = probs.multinomial(num_samples=1)
+            log_probs = F.log_softmax(logits, dim=-1).gather(1, actions)
 
             mem_log_probs[step] = log_probs
             mem_actions[step] = actions
             mem_values[step] = values
-
 
             for idx in range(count_of_envs):
                 observation, reward, terminal = envs[idx].step(actions[idx, 0].item())
@@ -93,7 +97,10 @@ def worker(connection, env_params, env_func, count_of_iterations, count_of_envs,
                     scores.append(game_score[idx])
                     game_score[idx] = 0
                     observation = envs[idx].reset()
-                observations[idx] = torch.from_numpy(observation)
+                # observations[idx] = observation.clone().detach()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    observations[idx] = torch.tensor(observation)
 
         connection.send(observations.float())
         mem_values[step + 1] = connection.recv()
@@ -113,11 +120,12 @@ def worker(connection, env_params, env_func, count_of_iterations, count_of_envs,
     connection.recv()
     connection.close()
 
+
 class Agent:
-    def __init__(self, model, optimizer, gamma = 0.997, epsilon = 0.1,
-                 coef_value = 0.5, coef_entropy = 0.001, gae_lambda = 0.95,
-                 path = 'results/', device = 'cpu',
-                 value_support_size = 1):
+    def __init__(self, model, optimizer, gamma=0.997, epsilon=0.1,
+                 coef_value=0.5, coef_entropy=0.001, gae_lambda=0.95,
+                 path='results/', device='cpu',
+                 value_support_size=1):
 
         self.model = model
         self.optimizer = optimizer
@@ -137,10 +145,10 @@ class Agent:
         self.support_to_value = value_support_size > 1
         self.value_support_interval = value_support_size * 2 + 1
 
-    def train(self, env_params, env_func, count_of_actions,
-              count_of_iterations = 10000, count_of_processes = 2,
-              count_of_envs = 16, count_of_steps = 128, count_of_epochs = 4,
-              batch_size = 512, input_dim = 4):
+    def train(self, env_param1, env_param2, env_param3, env_func, count_of_actions,
+              count_of_iterations=10000, count_of_processes=2,
+              count_of_envs=16, count_of_steps=128, count_of_epochs=4,
+              batch_size=512, input_dim=4):
 
         print('Training is starting')
 
@@ -154,22 +162,25 @@ class Agent:
         processes, connections = [], []
         for _ in range(count_of_processes):
             parr_connection, child_connection = Pipe()
-            process = Process(target = worker, args = (
-                child_connection, env_params, env_func, count_of_iterations,
+            process = Process(target=worker, args=(
+                child_connection, env_param1, env_param2, env_param3, env_func, count_of_iterations,
                 count_of_envs, count_of_steps, self.gamma, self.gae_lambda))
             connections.append(parr_connection)
             processes.append(process)
             process.start()
 
         mem_dim = (count_of_processes, count_of_steps, count_of_envs)
-        mem_observations = torch.zeros((mem_dim + (input_dim,)), device = self.device)
-        mem_actions = torch.zeros((*mem_dim, 1), device = self.device, dtype = torch.long)
-        mem_log_probs = torch.zeros((*mem_dim , 1), device = self.device)
+        mem_observations = torch.zeros((mem_dim + (input_dim,)), device=self.device)
+        # mem_observations = torch.zeros((mem_dim + input_dim), device=self.device)
+        # mem_observations = torch.zeros((mem_dim, input_dim), device=self.device)
+        # mem_observations = torch.zeros((mem_dim, input_dim), dtype=torch.float, device=self.device)
+        mem_actions = torch.zeros((*mem_dim, 1), device=self.device, dtype=torch.long)
+        mem_log_probs = torch.zeros((*mem_dim, 1), device=self.device)
         if self.support_to_value:
-            mem_values = torch.zeros((*mem_dim, self.value_support_interval), device = self.device)
+            mem_values = torch.zeros((*mem_dim, self.value_support_interval), device=self.device)
         else:
-            mem_values = torch.zeros((*mem_dim, 1), device = self.device)
-        mem_advantages = torch.zeros((*mem_dim, 1), device = self.device)
+            mem_values = torch.zeros((*mem_dim, 1), device=self.device)
+        mem_advantages = torch.zeros((*mem_dim, 1), device=self.device)
 
         for iteration in range(count_of_iterations):
             for step in range(count_of_steps):
@@ -178,7 +189,7 @@ class Agent:
                 mem_observations[:, step] = observations
 
                 with torch.no_grad():
-                    logits, values = self.model(observations.view(-1, *input_dim))
+                    logits, values = self.model(observations.view(-1, *(input_dim,)))
 
                 # If you selected actions in the main process, your iteration
                 # would last about 0.5 seconds longer (measured on 2 processes)
@@ -197,7 +208,7 @@ class Agent:
             observations = torch.stack(observations).to(self.device)
 
             with torch.no_grad():
-                _, values = self.model(observations.view(-1, *input_dim))
+                _, values = self.model(observations.view(-1, *(input_dim,)))
 
             if self.support_to_value:
                 values = support_to_scalar(values, self.value_support_size).view(
@@ -206,6 +217,7 @@ class Agent:
                 values = values.view(-1, count_of_envs, 1).cpu()
 
             for idx in range(count_of_processes):
+                print(values[idx])
                 connections[idx].send(values[idx])
 
             for idx in range(count_of_processes):
@@ -228,7 +240,7 @@ class Agent:
                 print('New best avg score has been achieved', avg_score)
                 torch.save(self.model.state_dict(), self.path + 'model.pt')
 
-            mem_observations = mem_observations.view(-1, *input_dim)
+            mem_observations = mem_observations.view(-1, *(input_dim,))
             mem_actions = mem_actions.view(-1, 1)
             mem_log_probs = mem_log_probs.view(-1, 1)
 
@@ -242,18 +254,18 @@ class Agent:
             s_policy, s_value, s_entropy = 0.0, 0.0, 0.0
 
             for epoch in range(count_of_epochs):
-                perm = torch.randperm(buffer_size, device = self.device).view(-1, batch_size)
+                perm = torch.randperm(buffer_size, device=self.device).view(-1, batch_size)
                 for idx in perm:
                     logits, values = self.model(mem_observations[idx])
-                    probs = F.softmax(logits, dim = -1)
-                    log_probs = F.log_softmax(logits, dim = -1)
+                    probs = F.softmax(logits, dim=-1)
+                    log_probs = F.log_softmax(logits, dim=-1)
                     new_log_probs = log_probs.gather(1, mem_actions[idx])
 
                     entropy_loss = (log_probs * probs).sum(1, keepdim=True).mean()
 
                     if self.support_to_value:
-                        values_log_probs = F.log_softmax(values, dim = -1)
-                        value_loss = torch.sum(- mem_values[idx] * values_log_probs, dim = 1).mean()
+                        values_log_probs = F.log_softmax(values, dim=-1)
+                        value_loss = torch.sum(- mem_values[idx] * values_log_probs, dim=1).mean()
                     else:
                         value_loss = F.mse_loss(values, mem_values[idx])
 
@@ -269,12 +281,12 @@ class Agent:
 
                     self.optimizer.zero_grad()
                     loss = policy_loss + self.coef_value * value_loss \
-                            + self.coef_entropy * entropy_loss
+                           + self.coef_entropy * entropy_loss
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                     self.optimizer.step()
 
-            mem_observations = mem_observations.view((mem_dim + input_dim))
+            mem_observations = mem_observations.view((mem_dim + (input_dim,)))
             mem_actions = mem_actions.view((*mem_dim, 1))
             mem_log_probs = mem_log_probs.view((*mem_dim, 1))
             if self.support_to_value:
@@ -284,9 +296,9 @@ class Agent:
             mem_advantages = mem_advantages.view((*mem_dim, 1))
 
             logs_score += '\n' + str(iteration) + ',' \
-                         + str(score.get_count_of_episodes()) + ',' \
-                         + str(avg_score) + ',' \
-                         + str(score.get_best_avg_score())
+                          + str(score.get_count_of_episodes()) + ',' \
+                          + str(avg_score) + ',' \
+                          + str(score.get_best_avg_score())
 
             logs_loss += '\n' + str(iteration) + ',' \
                          + str(avg_score) + ',' \

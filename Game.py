@@ -1,4 +1,5 @@
 import ctypes
+import multiprocessing
 import os
 import pathlib
 import string
@@ -13,18 +14,22 @@ import win32ui
 import win32con
 import numpy as np
 from numpy import ndarray
-from win32api import Sleep
 
 from GPS import GPS
 from LapProgress import LapProgress
 from LapTime import LapTime
 from Speedometer import Speedometer
 
-from PIL import Image, ImageGrab
+from PIL import Image
 import pywinauto
 import pyautogui
-import Utils.direct_input
+
+from Strategy.gps.gps_strategy_enum import GPSStrategyEnum
+from Strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
+from Strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
+from Strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
 from Utils.controls import Controls
+from cv2 import cuda
 
 
 class Game:
@@ -63,10 +68,42 @@ class Game:
 
     a_race_initialised: bool
 
-    def __init__(self) -> None:
-        self.a_race_initialised = False
+    a_cycles_passed: int
 
-    def main_loop(self):
+    a_cuda_device: None
+
+    a_gps_img_rcg_strategy: AGpsImageRecognitionStrategy
+
+    a_gps_strategy_enum: GPSStrategyEnum
+
+    def __init__(self) -> None:
+
+        self.a_race_initialised = False
+        self.a_car_offset = 0
+        self.a_cycles_passed = 0
+
+        cuda.printCudaDeviceInfo(0)
+
+        try:
+            count = cv2.cuda.getCudaEnabledDeviceCount()
+            if count > 0:
+                self.a_gps_img_rcg_strategy = GpsImageRecognitionStrategyGPU()
+                self.a_gps_strategy_enum = GPSStrategyEnum.GPU
+            else:
+                self.a_gps_img_rcg_strategy = GpsImageRecognitionStrategyCPU()
+                self.a_gps_strategy_enum = GPSStrategyEnum.CPU
+        except:
+            GpsImageRecognitionStrategyCPU()
+            self.a_gps_strategy_enum = GPSStrategyEnum.CPU
+
+    def init_game_memory_objects(self) -> None:
+        self.a_speedometer.construct()
+        self.a_lap_progress.construct()
+        self.a_lap_time.construct()
+
+    def main_loop(self, par_queue_agent_inputs: multiprocessing.Queue,
+                  par_queue_game_started_inputs: multiprocessing.Queue,
+                  par_queue_restart_game_input: multiprocessing.Queue):
 
         self.a_speed = 1
 
@@ -77,9 +114,11 @@ class Game:
         self.start_game()
         # self.start_cheat_engine()
 
+        print(cv2.__version__)
+
         while not self.process_exists("speed.exe"):
             print("Waiting for Game to Start")
-            time.sleep(1)
+            time.sleep(2)
 
         self.a_speedometer = Speedometer()
 
@@ -87,7 +126,9 @@ class Game:
 
         self.a_lap_time = LapTime()
 
-        self.a_gps = GPS()
+        self.init_game_memory_objects()
+
+        self.a_gps = GPS(self.a_gps_strategy_enum)
 
         tmp_grayscale: None
 
@@ -106,58 +147,50 @@ class Game:
 
         time.sleep(5)
 
-        self.init_game_race(0.7, 0.1)
+        self.init_game_race(0.7 / float(self.a_speed), 0.1 / float(self.a_speed))
 
         time.sleep(3)
 
         self.a_race_initialised = True
 
+        self.a_cycles_passed = 0
+
+        par_queue_game_started_inputs.put((self.a_race_initialised, self.a_speed))
+
         while True:
 
+            # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height, rect = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
 
+            # Define the region of interest
             self.a_interest_rect_vert = [
                 (0, self.a_height),
                 (self.a_width / 2, self.a_height / 2),
                 (self.a_width, self.a_height)
             ]
 
+            # Check for quit key
             if cv2.waitKey(1) == ord('q'):
                 cv2.destroyAllWindows()
                 break
 
+            # Check for record key
             if keyboard.is_pressed('r'):
                 self.a_is_recording = True
                 self.a_list_bitmap = []
 
-            tmp_grayscale = self.make_grayscale(self.a_screenshot)
-            tmp_gps_final = cv2.equalizeHist(tmp_grayscale)
-            tmp_gps, tmp_gps_center = self.a_gps.get_gps_mask(tmp_gps_final)
-            tmp_gps = cv2.bitwise_and(self.a_screenshot, self.a_screenshot, mask=tmp_gps)
-
-            tmp_gps_hsv = cv2.cvtColor(tmp_gps, cv2.COLOR_BGR2HSV)
-
-            cv2.imshow('Main DKO', tmp_grayscale)
-
-            # tmp_gps_mask_lines = cv2.inRange(tmp_gps_hsv, np.array([0, 0, 87]), np.array([179, 136, 123]))
-            tmp_gps_greyscale = cv2.inRange(tmp_gps_hsv, np.array([0, 0, 174]), np.array([179, 10, 255]))
-
-            tmp_contour = self.a_gps.make_gps_contour(tmp_gps_greyscale, self.a_screenshot, tmp_gps_center)
-
             tmp_speed_mph = self.a_speedometer.return_speed_mph()
+            tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
 
-            tmp_car_pos = self.a_gps.get_car_point(self.a_screenshot, tmp_gps_center)
-
-            tmp_car_offset = self.a_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
+            #tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
+            tmp_car_offset, tmp_contour = self.a_gps_img_rcg_strategy.calc_car_offset(self.a_gps, self.a_screenshot)
 
             self.a_car_offset = tmp_car_offset
 
-            tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
-
             # tmp_lap_time = self.a_lap_time.return_lap_time()
-
-            cv2.drawContours(self.a_screenshot, [tmp_contour], -1, (255, 0, 255), -1)
+            if tmp_contour is not None:
+                cv2.drawContours(self.a_screenshot, [tmp_contour], -1, (255, 0, 255), -1)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
             fontScale = 1
@@ -203,24 +236,51 @@ class Game:
                 tmp_frame_counter = 0
                 tmp_start_time = time.time()
 
+            self.a_cycles_passed += 1
+
+            while not par_queue_restart_game_input.empty():
+                tmp_needs_restart: bool = par_queue_restart_game_input.get()
+                if tmp_needs_restart:
+                    par_queue_restart_game_input.put(tmp_needs_restart)
+                    self.reset_game_race(0.7 / float(self.a_speed), 0.01 / float(self.a_speed))
+                    par_queue_restart_game_input.get()
+
+            # .empty() returns False or True, it is not function to empty the Queue
+            # Maybe some python coders can use function declaration, when they know that it
+            # returns bool to use naming like isEmpty? :)
+            while not par_queue_agent_inputs.empty():
+                par_queue_agent_inputs.get()
+            par_queue_agent_inputs.put((self.get_speed_mph(), self.get_car_offset(),
+                                        self.a_lap_progress.return_lap_completed_percent()))
+
     def is_race_initialised(self) -> bool:
         return self.a_race_initialised
 
     def get_lap_progress(self) -> float:
         return self.a_lap_progress.return_lap_completed_percent()
 
-    def get_car_offset(self) -> float:
+    def get_car_offset(self, par_test=0) -> float:
+        if par_test == 1:
+            print("Offset:" + str(self.a_car_offset) + "" + str(self.a_screenshot))
         return self.a_car_offset
 
     def get_speed_mph(self) -> float:
         return self.a_speedometer.return_speed_mph()
 
-    def make_grayscale(self, par_image):
-        grayscale = cv2.cvtColor(par_image, cv2.COLOR_BGR2GRAY)
-        return cv2.GaussianBlur(grayscale, (5, 5), 0)
-
     def make_canny(self, par_grayscale):
-        return cv2.Canny(par_grayscale, self.a_threshold, self.a_threshold * self.a_ratio)
+        # return cv2.Canny(par_grayscale, self.a_threshold, self.a_threshold * self.a_ratio)
+
+        # Convert input to a GpuMat
+        gpu_input = cv2.cuda_GpuMat(par_grayscale)
+
+        # Perform Canny edge detection on the GPU
+        gpu_output = cv2.cuda.createCannyEdgeDetector(self.a_threshold, self.a_threshold * self.a_ratio)
+        gpu_edges = gpu_output.detect(gpu_input)
+
+        # Download the result to CPU memory
+        edges = gpu_edges.download()
+
+        return edges
 
     def region_of_interest(self, par_img, par_vertices):
         mask = np.zeros_like(par_img)
@@ -231,6 +291,7 @@ class Game:
         # Return Image Where Only The Mask Pixel Matches
         masked_image = cv2.bitwise_and(par_img, mask)
         return masked_image
+
 
     def window_capture(self):
         w = 800  # set this
@@ -290,7 +351,6 @@ class Game:
             win32gui.SetForegroundWindow(hwnd)
         except win32gui.error as e:
             print("An error occurred while setting the foreground window (Probably Debugging): ", e)
-
 
         return img, w, h, rect
 
@@ -445,6 +505,26 @@ class Game:
     def focus_on_game(self) -> None:
         hwnd = win32gui.FindWindow(None, 'Need for Speed™ Most Wanted')
         win32gui.SetForegroundWindow(hwnd)
+
+    def reset_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
+        # First Press To Pause Menu
+        self.a_controls.PressAndReleaseKey(self.a_controls.ESCAPE, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Then We Proceed to The Right - Restart Button
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Press Enter - Restarts The Race
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        # Then Prompt Will Appear - We Move To The OK Button
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+        # Press Enter - Accepts The Prompt
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
+        time.sleep(3)
 
     def init_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
 

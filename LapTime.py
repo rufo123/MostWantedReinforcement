@@ -14,10 +14,12 @@ class LapTime:
     offsets = [0x2E8, 0xC, 0xC, 0x18, 0x2C, 0x2F0, 0x48]
 
     def __init__(self):
-        self.mem = Pymem("speed.exe")
-        self.module = module_from_name(self.mem.process_handle, "speed.exe").lpBaseOfDll
         self.lock = Lock()
         self.shared_lap_time = Value('i', 0)
+
+    def construct(self):
+        self.mem = Pymem("speed.exe")
+        self.module = module_from_name(self.mem.process_handle, "speed.exe").lpBaseOfDll
 
     def return_lap_time(self):
         self.lock.acquire()

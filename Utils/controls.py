@@ -2,6 +2,9 @@ import ctypes
 import threading
 import time
 
+# Direct Input Scan Codes:
+# https://gist.github.com/tracend/912308
+
 
 class Controls():
 
@@ -12,6 +15,7 @@ class Controls():
     HAND_BRAKE: int = 0x39
 
     ENTER: int = 0x1C
+    ESCAPE: int = 0x01
 
     def __init__(self,):
         pass
@@ -30,47 +34,55 @@ class Controls():
         x = Input(ctypes.c_ulong(1), ii_)
         ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
-    def PressAndReleaseKey(self, par_hex_key_code: int, par_sleep_time: int = 1) -> None:
+    def PressAndReleaseKey(self, par_hex_key_code: int, par_sleep_time: float = 1) -> None:
         self.PressKey(par_hex_key_code)
         time.sleep(par_sleep_time)
         self.ReleaseKey(par_hex_key_code)
         time.sleep(par_sleep_time)
 
-    def PressAndReleaseTwoKeys(self, par_hex_key_code_first: int, par_hex_key_code_second: int, par_sleep_time: int = 1):
+    def PressAndReleaseTwoKeys(self, par_hex_key_code_first: int, par_hex_key_code_second: int, par_sleep_time: float = 1):
         self.PressKey(par_hex_key_code_first)
         self.PressKey(par_hex_key_code_second)
-        time.sleep(par_sleep_time)
+        time.sleep(par_sleep_time / 2)
         self.ReleaseKey(par_hex_key_code_first)
         self.ReleaseKey(par_hex_key_code_second)
-        time.sleep(par_sleep_time)
+        time.sleep(par_sleep_time/ 2)
 
-    def Forward(self):
-        self.PressAndReleaseKey(self.UP_KEY)
+    def Forward(self, par_sleep_time: float = 1):
+        self.PressAndReleaseKey(self.UP_KEY, par_sleep_time)
 
-    def Backward(self):
-        self.PressAndReleaseKey(self.DOWN_KEY)
+    def Backward(self, par_sleep_time: float = 1):
+        self.PressAndReleaseKey(self.DOWN_KEY, par_sleep_time)
 
-    def Left(self):
-        self.PressAndReleaseKey(self.LEFT_KEY)
+    def Left(self, par_sleep_time: float = 1):
+        self.PressAndReleaseKey(self.LEFT_KEY, par_sleep_time)
 
-    def Right(self):
-        self.PressAndReleaseKey(self.RIGHT_KEY)
+    def Right(self, par_sleep_time: float = 1):
+        self.PressAndReleaseKey(self.RIGHT_KEY, par_sleep_time)
 
-    def ForwardRight(self):
-        self.PressAndReleaseTwoKeys(self.UP_KEY, self.RIGHT_KEY)
+    def ForwardRight(self, par_sleep_time: float = 1):
+        self.PressAndReleaseTwoKeys(self.UP_KEY, self.RIGHT_KEY, par_sleep_time)
 
-    def ForwardLeft(self):
-        self.PressAndReleaseTwoKeys(self.UP_KEY, self.LEFT_KEY)
+    def ForwardLeft(self, par_sleep_time: float = 1):
+        self.PressAndReleaseTwoKeys(self.UP_KEY, self.LEFT_KEY, par_sleep_time)
 
-    def BackwardLeft(self):
-        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.LEFT_KEY)
+    def BackwardLeft(self, par_sleep_time: float = 1):
+        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.LEFT_KEY, par_sleep_time)
 
-    def BackwardRight(self):
-        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.RIGHT_KEY)
+    def BackwardRight(self, par_sleep_time: float = 1):
+        self.PressAndReleaseTwoKeys(self.DOWN_KEY, self.RIGHT_KEY, par_sleep_time)
 
-    def HandBrake(self):
-        self.PressAndReleaseKey(self.HAND_BRAKE)
+    def HandBrake(self, par_sleep_time: float = 1):
+        self.PressAndReleaseKey(self.HAND_BRAKE, par_sleep_time)
 
+    def ReleaseAllKeys(self):
+        self.ReleaseKey(self.UP_KEY)
+        self.ReleaseKey(self.DOWN_KEY)
+        self.ReleaseKey(self.RIGHT_KEY)
+        self.ReleaseKey(self.LEFT_KEY)
+        self.ReleaseKey(self.ESCAPE)
+        self.ReleaseKey(self.ENTER)
+        self.ReleaseKey(self.HAND_BRAKE)
 
 PUL = ctypes.POINTER(ctypes.c_ulong)
 
