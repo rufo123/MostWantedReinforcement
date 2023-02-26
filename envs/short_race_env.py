@@ -58,13 +58,15 @@ class Env:
         tmp_tuple_with_values: tuple = self.a_queue_agent_inputs.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]
-        tmp_car_offset: float = tmp_tuple_with_values[1]
+        tmp_car_distance_offset: float = tmp_tuple_with_values[1]
         tmp_lap_progress: float = tmp_tuple_with_values[2]
+        tmp_car_direction_offset: int = tmp_tuple_with_values[3]
 
-        state = torch.tensor([tmp_speed, tmp_car_offset,
-                              tmp_lap_progress])
+        state = torch.tensor([tmp_speed, tmp_car_distance_offset,
+                              tmp_lap_progress, tmp_car_direction_offset])
 
         state = state.numpy()
+        print(state)
 
         return state, tmp_reward, terminal
 
@@ -84,6 +86,7 @@ class Env:
             print("Waiting For Game To Restart")
             time.sleep(1)
         self.a_step_counter = 0
+        print("return state: " + str(state))
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
@@ -104,8 +107,9 @@ class Env:
         tmp_tuple_with_values: tuple = self.a_queue_agent_inputs.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]
-        tmp_car_offset: float = tmp_tuple_with_values[1]
+        tmp_car_distance_offset: float = tmp_tuple_with_values[1]
         tmp_lap_progress: float = tmp_tuple_with_values[2]
+        tmp_car_direction_offset: float = tmp_tuple_with_values[3]
 
 
         # Ako daleko som od idealnej linie?
@@ -113,48 +117,57 @@ class Env:
 
         # Fiat Punto Top Speed - 179 # Zatial docasne prec
 
-        # 0 - 50 - Negative Reward ((-1) - 0)
-        if -1 >= tmp_speed < 50:
-            reward += (((50 - tmp_speed) / 50) / 255) * -1
-        # 50 - 100 - Positive Reward ( 0 - 1)
-        elif 50 <= tmp_speed <= 100:
-            reward += (((tmp_speed - 50) / 50) / 255)
-        # 100 - 179 - Reward 1 - (-1)
-        else:
-            reward += (((179 - tmp_speed) / 39.5) - 1) / 255
+    # 0 - 50 - Negative Reward ((-1) - 0)
+        #if -1 >= tmp_speed < 50:
+            #reward += (((50 - tmp_speed) / 50) / 255) * -1
+    # 50 - 100 - Positive Reward ( 0 - 1)
+        #elif 50 <= tmp_speed <= 100:
+            #reward += (((tmp_speed - 50) / 50) / 255)
+    # 100 - 179 - Reward 1 - (-1)
+        #else:
+            #reward += (((179 - tmp_speed) / 39.5) - 1) / 255
 
         # Lap Progress Percent Reward + upravit na presnejsie jednotky
-        if self.get_lap_progress_dif(tmp_lap_progress) == 1:
-            reward += 1 / 255
+        if self.get_lap_progress_dif(tmp_lap_progress) == 0.1:
+            reward += 0.1 / 255
             self.update_lap_curr(tmp_lap_progress)
-        elif self.get_lap_progress_dif(tmp_lap_progress) == -1:
-            reward += -1 / 255
+        elif self.get_lap_progress_dif(tmp_lap_progress) == -0.1:
+            reward += -0.1 / 255
             self.update_lap_curr(tmp_lap_progress)
 
         # Offset Reward
-        if tmp_car_offset > 1:
-            # Negative Reward
-            reward += ((tmp_car_offset - 1) / 255) * -1
-        elif tmp_car_offset < -1:
-            # Negative Reward
-            reward += ((tmp_car_offset - (-1)) / 255)
-        elif 1 >= tmp_car_offset > 0:
-            # Positive Reward - Offset 1 - 0
-            reward += ((1 - abs(tmp_car_offset)) / 255)
-        elif -1 <= tmp_car_offset < 0:
-            # Positive Reward - Offset -1 - 0
-            reward += ((1 - abs(tmp_car_offset)) / 255)
+        if 1 < tmp_car_distance_offset <= 10:
+            # Negative Reward - Offset Between - < 1, 10 )
+            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - 1) / 10
+            reward += (tmp_normalized_offset_div_10 / 255) * -1
+
+        elif -1 > tmp_car_distance_offset >= -10:
+            # Negative Reward - Offset Between - ( -10, -1 >
+            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 10
+            reward += tmp_normalized_offset_div_10 / 255
+        elif tmp_car_distance_offset > 10 or tmp_car_distance_offset < -10:
+            # Negative Reward - Offset Greater Than 10 or Lower Than -10
+            reward += -1 / 255
+
+        elif 1 >= tmp_car_distance_offset > 0:
+            # Positive Reward - Offset <0, 1>
+            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
+
+        elif -1 <= tmp_car_distance_offset < 0:
+            # Positive Reward - Offset <-1, 0>
+            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
+
         else:
             # Positive Reward - Offset Equals 0
-            reward += ((1 - abs(tmp_car_offset)) / 255)
+            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
 
-        new_state = torch.tensor([tmp_speed, tmp_car_offset,
-                                  tmp_lap_progress])
+        new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
+                                  tmp_lap_progress, tmp_car_direction_offset])
         print("Rewardo: " + str(reward))
         self.a_reward = reward
         self.a_step_counter += 1
-
-        if self.a_step_counter >= 10:
+        print(self.a_step_counter)
+        if self.a_step_counter >= 500 or tmp_lap_progress >= 10:
             terminal = True
             print("Terminal")
 
@@ -162,6 +175,8 @@ class Env:
 
     def take_action(self, action, par_sleep_time: float = 1) -> int:
         print("Akcia")
+        self.controls.Forward(par_sleep_time)
+
         if action == 0:
             self.controls.Forward(par_sleep_time)
         elif action == 1:

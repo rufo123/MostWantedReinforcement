@@ -68,7 +68,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
         os.mkdir(path)
         print('new directory has been created')
 
-    dim1 = 3
+    dim1 = 4
     count_of_actions = 8
     count_of_features = 8448
 
@@ -124,7 +124,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
                     count_of_envs=count_of_envs,
                     count_of_steps=count_of_steps,
                     count_of_epochs=count_of_epochs,
-                    batch_size=batch_size, input_dim=(dim1))
+                    batch_size=batch_size, input_dim=dim1)
         # except Exception as e:
         #     i = i - 1
         #     continue

@@ -7,7 +7,7 @@ from GPS import GPS
 
 class AGpsImageRecognitionStrategy(ABC):
     @abstractmethod
-    def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list]:
+    def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list, int]:
         """
         Abstract Method That Calculates Car Offset From Minimap (GPS)
         :param par_gps: The GPS Class

@@ -3,14 +3,17 @@ import numpy as np
 from numpy import ndarray
 
 from GPS import GPS
-from Strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
+from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 
 
 class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
 
     import time
 
-    def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list]:
+    def __init__(self):
+        self.a_car_offset = None
+
+    def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list, int]:
         time = self.time.time()
         # Convert to grayscale and equalize histogram
         tmp_grayscale_gpu = self.make_grayscale(par_image)
@@ -47,9 +50,13 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
         tmp_car_pos = par_gps.get_car_point(par_image, tmp_gps_center)
 
         # Get car offset and lap progress
-        tmp_car_offset = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
+        tmp_car_offset_dist = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
 
-        return tmp_car_offset, tmp_contour
+        tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour, tmp_car_pos)
+
+        self.a_car_offset = tmp_car_offset_dist
+
+        return tmp_car_offset_dist, tmp_contour, tmp_car_directional_offset
 
     def make_grayscale(self, par_image: ndarray) -> cv2.cuda.GpuMat:
         grayscale = cv2.cvtColor(par_image, cv2.COLOR_BGR2GRAY)

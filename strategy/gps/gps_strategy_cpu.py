@@ -1,7 +1,7 @@
 import cv2
 from numpy import ndarray
 
-from Strategy.gps.a_gps_strategy import AGPSStrategy
+from strategy.gps.a_gps_strategy import AGPSStrategy
 
 
 class GPSStrategyCPU(AGPSStrategy):

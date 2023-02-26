@@ -5,19 +5,21 @@ import cv2
 import numpy as np
 from numpy import ndarray
 
-from Strategy.gps.a_gps_strategy import AGPSStrategy
-from Strategy.gps.gps_strategy_cpu import GPSStrategyCPU
-from Strategy.gps.gps_strategy_enum import GPSStrategyEnum
-from Strategy.gps.gps_strategy_gpu import GPSStrategyGPU
+from strategy.gps.a_gps_strategy import AGPSStrategy
+from strategy.gps.gps_strategy_cpu import GPSStrategyCPU
+from strategy.gps.gps_strategy_enum import GPSStrategyEnum
+from strategy.gps.gps_strategy_gpu import GPSStrategyGPU
 
 
 class GPS:
-    a_last_calculated_offset: float
+    a_last_calculated_distance_offset: float
+    a_last_calculated_direction_offset: int
 
     a_gps_strategy: AGPSStrategy
 
     def __init__(self, par_strategy_enum: GPSStrategyEnum):
-        self.a_last_calculated_offset = 0
+        self.a_last_calculated_distance_offset = 0
+        self.a_last_calculated_direction_offset = 0
 
         if par_strategy_enum == GPSStrategyEnum.CPU:
             self.a_gps_strategy = GPSStrategyCPU()
@@ -41,9 +43,34 @@ class GPS:
 
     def polygon_contour_test(self, par_contour, par_car_pos):
         if par_contour is not None and par_car_pos is not None and len(par_car_pos) > 1:
-            self.a_last_calculated_offset = cv2.pointPolygonTest(par_contour,
-                                                                 (float(par_car_pos[0]), float(par_car_pos[1])), True)
-        return self.a_last_calculated_offset
+            self.a_last_calculated_distance_offset = cv2.pointPolygonTest(par_contour,
+                                                                          (float(par_car_pos[0]), float(par_car_pos[1])), True)
+            #print(self.a_last_calculated_distance_offset)
+        return self.a_last_calculated_distance_offset
+
+    def check_direction_point_to_contour(self, par_contour, par_car_pos) -> int:
+        if par_contour is not None and par_car_pos is not None and len(par_car_pos) > 1:
+            nearest_pt_idx = np.argmin(np.linalg.norm(par_contour - par_car_pos, axis=2))
+            if par_contour[nearest_pt_idx][0][0] < par_car_pos[0]:
+                #print(1)
+                # Car is inclined to the right of the road centre
+                self.a_last_calculated_direction_offset = 1
+            elif par_contour[nearest_pt_idx][0][0] > par_car_pos[0]:
+                #print(0)
+                # Car is inclined to the left of the road centre
+                self.a_last_calculated_direction_offset = -1
+            else:
+                # Car is going straight towards the road centre
+                self.a_last_calculated_direction_offset = 0
+        return self.a_last_calculated_direction_offset
+
+    def translate_direction_offset_to_string(self, par_direction_from_contour: int) -> str:
+        if par_direction_from_contour == -1:
+            return "Left"
+        elif par_direction_from_contour == 1:
+            return "Right"
+        else:
+            return "Straight"
 
     def divide_if_possible(self, dividend, divider):
         if (divider is not None) & (divider != 0):

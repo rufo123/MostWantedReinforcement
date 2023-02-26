@@ -38,7 +38,7 @@ class Controls():
         self.PressKey(par_hex_key_code)
         time.sleep(par_sleep_time)
         self.ReleaseKey(par_hex_key_code)
-        time.sleep(par_sleep_time)
+        #time.sleep(par_sleep_time)
 
     def PressAndReleaseTwoKeys(self, par_hex_key_code_first: int, par_hex_key_code_second: int, par_sleep_time: float = 1):
         self.PressKey(par_hex_key_code_first)
@@ -46,7 +46,7 @@ class Controls():
         time.sleep(par_sleep_time / 2)
         self.ReleaseKey(par_hex_key_code_first)
         self.ReleaseKey(par_hex_key_code_second)
-        time.sleep(par_sleep_time/ 2)
+        #time.sleep(par_sleep_time/ 2)
 
     def Forward(self, par_sleep_time: float = 1):
         self.PressAndReleaseKey(self.UP_KEY, par_sleep_time)

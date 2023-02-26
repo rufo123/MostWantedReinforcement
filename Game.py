@@ -24,10 +24,10 @@ from PIL import Image
 import pywinauto
 import pyautogui
 
-from Strategy.gps.gps_strategy_enum import GPSStrategyEnum
-from Strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
-from Strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
-from Strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
+from strategy.gps.gps_strategy_enum import GPSStrategyEnum
+from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
+from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
+from strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
 from Utils.controls import Controls
 from cv2 import cuda
 
@@ -64,7 +64,9 @@ class Game:
 
     a_speed: int
 
-    a_car_offset: float
+    a_car_distance_offset: float
+
+    a_car_direction_offset: int
 
     a_race_initialised: bool
 
@@ -79,7 +81,8 @@ class Game:
     def __init__(self) -> None:
 
         self.a_race_initialised = False
-        self.a_car_offset = 0
+        self.a_car_distance_offset = 0
+        self.a_car_direction_offset = 0
         self.a_cycles_passed = 0
 
         cuda.printCudaDeviceInfo(0)
@@ -105,7 +108,7 @@ class Game:
                   par_queue_game_started_inputs: multiprocessing.Queue,
                   par_queue_restart_game_input: multiprocessing.Queue):
 
-        self.a_speed = 1
+        self.a_speed = 3
 
         self.a_list_bitmap = []
 
@@ -183,10 +186,15 @@ class Game:
             tmp_speed_mph = self.a_speedometer.return_speed_mph()
             tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
 
-            #tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
-            tmp_car_offset, tmp_contour = self.a_gps_img_rcg_strategy.calc_car_offset(self.a_gps, self.a_screenshot)
+            # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
+            tmp_car_offset_distance: float
+            tmp_contour: list
+            tmp_car_offset_direction: int
+            tmp_car_offset_distance, tmp_contour, tmp_car_offset_direction = self.a_gps_img_rcg_strategy.calc_car_offset(
+                self.a_gps, self.a_screenshot)
 
-            self.a_car_offset = tmp_car_offset
+            self.a_car_distance_offset = tmp_car_offset_distance
+            self.a_car_direction_offset = tmp_car_offset_direction
 
             # tmp_lap_time = self.a_lap_time.return_lap_time()
             if tmp_contour is not None:
@@ -208,7 +216,7 @@ class Game:
                         lineType)
 
             bottomLeftCornerOfText = (10, int(self.a_height / 3))
-            cv2.putText(self.a_screenshot, "Road Offset: " + str(round(tmp_car_offset, 2)) + "",
+            cv2.putText(self.a_screenshot, "Road Offset: " + str(round(tmp_car_offset_distance, 2)) + "",
                         bottomLeftCornerOfText,
                         font,
                         fontScale,
@@ -226,6 +234,15 @@ class Game:
                         lineType)
 
             bottomLeftCornerOfText = (10, int(self.a_height / 2))
+            cv2.putText(self.a_screenshot,
+                        "Incline: " + str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
+                        + "",
+                        bottomLeftCornerOfText,
+                        font,
+                        fontScale,
+                        fontColor,
+                        thickness,
+                        lineType)
 
             cv2.imshow('Main Vision', self.a_screenshot)
 
@@ -250,8 +267,9 @@ class Game:
             # returns bool to use naming like isEmpty? :)
             while not par_queue_agent_inputs.empty():
                 par_queue_agent_inputs.get()
-            par_queue_agent_inputs.put((self.get_speed_mph(), self.get_car_offset(),
-                                        self.a_lap_progress.return_lap_completed_percent()))
+            par_queue_agent_inputs.put((self.get_speed_mph(), self.get_car_distance_offset(),
+                                        self.a_lap_progress.return_lap_completed_percent(),
+                                        self.a_car_direction_offset))
 
     def is_race_initialised(self) -> bool:
         return self.a_race_initialised
@@ -259,10 +277,11 @@ class Game:
     def get_lap_progress(self) -> float:
         return self.a_lap_progress.return_lap_completed_percent()
 
-    def get_car_offset(self, par_test=0) -> float:
-        if par_test == 1:
-            print("Offset:" + str(self.a_car_offset) + "" + str(self.a_screenshot))
-        return self.a_car_offset
+    def get_car_distance_offset(self) -> float:
+        return self.a_car_distance_offset
+
+    def get_car_direction_offset(self) -> int:
+        return self.a_car_direction_offset
 
     def get_speed_mph(self) -> float:
         return self.a_speedometer.return_speed_mph()
@@ -291,7 +310,6 @@ class Game:
         # Return Image Where Only The Mask Pixel Matches
         masked_image = cv2.bitwise_and(par_img, mask)
         return masked_image
-
 
     def window_capture(self):
         w = 800  # set this
@@ -510,6 +528,11 @@ class Game:
         # First Press To Pause Menu
         self.a_controls.PressAndReleaseKey(self.a_controls.ESCAPE, par_sleep_time_key_press)
         time.sleep(par_sleep_time_delay)
+        # Also We Press The Left Key - To Debug The Behaviour, if the agent action didn't end correctly
+        # we will "unstuck" it
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        time.sleep(par_sleep_time_delay)
+
         # Then We Proceed to The Right - Restart Button
         self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
         time.sleep(par_sleep_time_delay)
