@@ -64,7 +64,6 @@ def worker(connection, env_param1, env_param2, env_param3, env_func, count_of_it
            count_of_steps, gamma, gae_lambda):
     envs = [env_func(env_param1, env_param2, env_param3) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
-    print("Shape" + str(observations.shape))
     game_score = np.zeros(count_of_envs)
 
     mem_log_probs = torch.zeros((count_of_steps, count_of_envs, 1))
@@ -88,7 +87,6 @@ def worker(connection, env_param1, env_param2, env_param3, env_func, count_of_it
 
             for idx in range(count_of_envs):
                 observation, reward, terminal = envs[idx].step(actions[idx, 0].item())
-                print("Obs2" + str(observation.shape))
                 mem_rewards[step, idx, 0] = reward
                 game_score[idx] += reward
                 if reward < 0:
@@ -102,8 +100,6 @@ def worker(connection, env_param1, env_param2, env_param3, env_func, count_of_it
                 # observations[idx] = observation.clone().detach()
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    print(observations)
-                    print("ShapeIDX" + str(observations[idx].shape))
                     observations[idx] = torch.tensor(observation)
 
         connection.send(observations.float())
@@ -221,7 +217,6 @@ class Agent:
                 values = values.view(-1, count_of_envs, 1).cpu()
 
             for idx in range(count_of_processes):
-                print(values[idx])
                 connections[idx].send(values[idx])
 
             for idx in range(count_of_processes):

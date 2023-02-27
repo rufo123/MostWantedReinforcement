@@ -66,7 +66,6 @@ class Env:
                               tmp_lap_progress, tmp_car_direction_offset])
 
         state = state.numpy()
-        print(state)
 
         return state, tmp_reward, terminal
 
@@ -86,11 +85,10 @@ class Env:
             print("Waiting For Game To Restart")
             time.sleep(1)
         self.a_step_counter = 0
-        print("return state: " + str(state))
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
-        return par_lap_progress - self.a_lap_percent_curr
+        return round(par_lap_progress - self.a_lap_percent_curr, 2)
 
     def update_lap_curr(self, par_new_lap_percent: float) -> None:
         self.a_lap_percent_curr = par_new_lap_percent
@@ -128,12 +126,12 @@ class Env:
             #reward += (((179 - tmp_speed) / 39.5) - 1) / 255
 
         # Lap Progress Percent Reward + upravit na presnejsie jednotky
-        if self.get_lap_progress_dif(tmp_lap_progress) == 0.1:
-            reward += 0.1 / 255
-            self.update_lap_curr(tmp_lap_progress)
-        elif self.get_lap_progress_dif(tmp_lap_progress) == -0.1:
-            reward += -0.1 / 255
-            self.update_lap_curr(tmp_lap_progress)
+        print("Progress: " + str(self.get_lap_progress_dif(tmp_lap_progress)))
+
+        tmp_lap_progress_difference = self.get_lap_progress_dif(tmp_lap_progress)
+
+        reward += (tmp_lap_progress_difference / 100) / 255
+        self.update_lap_curr(tmp_lap_progress)
 
         # Offset Reward
         if 1 < tmp_car_distance_offset <= 10:
@@ -166,17 +164,18 @@ class Env:
         print("Rewardo: " + str(reward))
         self.a_reward = reward
         self.a_step_counter += 1
-        print(self.a_step_counter)
         if self.a_step_counter >= 500 or tmp_lap_progress >= 10:
             terminal = True
+            if self.a_step_counter >= 500:
+                print("Exceeded Step Limit")
+            if tmp_lap_progress >= 10:
+                print("Lap Complete")
             print("Terminal")
 
         return new_state, reward, terminal
 
     def take_action(self, action, par_sleep_time: float = 1) -> int:
         print("Akcia")
-        self.controls.Forward(par_sleep_time)
-
         if action == 0:
             self.controls.Forward(par_sleep_time)
         elif action == 1:

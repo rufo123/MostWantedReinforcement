@@ -48,8 +48,8 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
     count_of_iterations = 20000
     count_of_processes = 1
     count_of_envs = 1
-    count_of_steps = 5
-    batch_size = 5
+    count_of_steps = 500
+    batch_size = 500
 
     count_of_epochs = 4
     lr = 2.5e-4
