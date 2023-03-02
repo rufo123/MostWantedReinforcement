@@ -6,6 +6,7 @@ import string
 import subprocess
 
 import time
+from typing import Dict
 
 import cv2
 import keyboard
@@ -28,7 +29,7 @@ from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
 from strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
-from Utils.controls import Controls
+from Utils.singleton.controls import Controls
 from cv2 import cuda
 
 
@@ -80,6 +81,8 @@ class Game:
 
     def __init__(self) -> None:
 
+        self.comparable_images: Dict[str, np.ndarray] = {}
+        self.load_comparable_images()
         self.a_race_initialised = False
         self.a_car_distance_offset = 0
         self.a_car_direction_offset = 0
@@ -119,9 +122,11 @@ class Game:
 
         print(cv2.__version__)
 
+        cv2.imshow("kok", self.comparable_images['restart_state'])
+
         while not self.process_exists("speed.exe"):
             print("Waiting for Game to Start")
-            time.sleep(2)
+            time.sleep(3)
 
         self.a_speedometer = Speedometer()
 
@@ -273,6 +278,16 @@ class Game:
 
     def is_race_initialised(self) -> bool:
         return self.a_race_initialised
+
+    def load_comparable_images(self) -> bool:
+        self.comparable_images: Dict[str, np.ndarray] = {}
+        directory: str = "comparable_images"
+        for filename in os.listdir(directory):
+            if filename.endswith(".png"):
+                img: np.ndarray = cv2.imread(os.path.join(directory, filename), cv2.IMREAD_COLOR)
+                name: str = os.path.splitext(filename)[0]
+                self.comparable_images[name] = img
+        return True
 
     def get_lap_progress(self) -> float:
         return self.a_lap_progress.return_lap_completed_percent()
@@ -524,33 +539,61 @@ class Game:
         hwnd = win32gui.FindWindow(None, 'Need for Speed™ Most Wanted')
         win32gui.SetForegroundWindow(hwnd)
 
-    def reset_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
-        # First Press To Pause Menu
-        self.a_controls.PressAndReleaseKey(self.a_controls.ESCAPE, par_sleep_time_key_press)
-        time.sleep(par_sleep_time_delay)
-        # Also We Press The Left Key - To Debug The Behaviour, if the agent action didn't end correctly
-        # we will "unstuck" it
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
-        time.sleep(par_sleep_time_delay)
+    def compare_screen_with_restart_image(self, par_screen_image: ndarray, par_restart_state_image_name: str):
+        if par_restart_state_image_name not in self.comparable_images:
+            print(f"No image found with name {par_restart_state_image_name}")
+            return False
+        stored_image = self.comparable_images[par_restart_state_image_name]
 
+        # Convert to grayscale
+        screen_gray = cv2.cvtColor(par_screen_image, cv2.COLOR_BGR2GRAY)
+        restart_state_gray = cv2.cvtColor(stored_image, cv2.COLOR_BGR2GRAY)
+
+        # Get dimensions of the restart state image
+        w, h = restart_state_gray.shape[::-1]
+
+        # Perform template matching
+        res = cv2.matchTemplate(screen_gray, restart_state_gray, cv2.TM_CCOEFF_NORMED)
+        threshold = 0.8
+        loc = np.where(res >= threshold)
+        print(loc)
+
+        if len(loc[0]) > 0:
+            # Restart state image found in screen capture
+            return True
+        else:
+            # Restart state image not found in screen capture
+            return False
+
+
+    def reset_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.ReleaseAllKeys()
+
+        # First Press To Pause Menu
+        while not self.compare_screen_with_restart_image(self.window_capture()[0], 'resume_race_text'):
+            self.a_controls.PressAndReleaseKey(self.a_controls.ESCAPE, par_sleep_time_key_press, True)
+            time.sleep(par_sleep_time_delay)
+
+        time.sleep(par_sleep_time_delay)
         # Then We Proceed to The Right - Restart Button
-        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Press Enter - Restarts The Race
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Then Prompt Will Appear - We Move To The OK Button
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Press Enter - Accepts The Prompt
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         time.sleep(3)
 
     def init_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
-
+        par_sleep_time_delay = par_sleep_time_delay * 2
         try:
             self.get_speed_mph()
         except Exception as e:
@@ -560,81 +603,81 @@ class Game:
             return
 
         # First Press To Go to Menu
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Accept Prompt
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Now We are in the Main Menu
-        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Now the selection will be on Challenge Series
-        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Now the selection will be on Quick Race
 
         # Quick Race Menu
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         time.sleep(par_sleep_time_delay)
         # Now the selection will be on Custom Race
-        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Custom Race Mode Select
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         time.sleep(par_sleep_time_delay)
         # Now the selection will be on Sprint
-        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.RIGHT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Sprint Track Select
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         time.sleep(par_sleep_time_delay)
 
         # Sprint Options
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Traffic Level - None
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Set Opponents to None
-        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Set Difficulty to Easy
-        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Catch Up Off
-        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.LEFT_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Accept
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         time.sleep(par_sleep_time_delay)
         # Set Car
-        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.DOWN_KEY, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
         # Transmission Auto
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         # Should Wait One Second to Start the Race
         time.sleep(par_sleep_time_delay * 5)
         # Press Enter To Speed Up The Starting
-        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press)
+        self.a_controls.PressAndReleaseKey(self.a_controls.ENTER, par_sleep_time_key_press, True)

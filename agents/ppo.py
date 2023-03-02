@@ -145,11 +145,27 @@ class Agent:
         self.support_to_value = value_support_size > 1
         self.value_support_interval = value_support_size * 2 + 1
 
+        self.start_iteration_value: int = 0
+
     def train(self, env_param1, env_param2, env_param3, env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
               batch_size=512, input_dim=4):
+        """
 
+        :param env_param1: Environment Inputs (Queue)
+        :param env_param2: Game Variables (Queue)
+        :param env_param3: Restart Game Inputs (Queue)
+        :param env_func: A function that returns the environment to be used for training.
+        :param count_of_actions: The number of possible actions in the environment.
+        :param count_of_iterations: the number of training iterations to run
+        :param count_of_processes: the number of parallel processes to use for training
+        :param count_of_envs: the number of environments to run in each process
+        :param count_of_steps: the number of steps to run in each environment per iteration
+        :param count_of_epochs: the number of times to update the network using the collected data
+        :param batch_size: the size of the batches used to update the network
+        :param input_dim: the dimensionality of the observation space
+        """
         print('Training is starting')
 
         logs_score = 'iteration,episode,avg_score,best_avg_score,best_score'
@@ -182,7 +198,7 @@ class Agent:
             mem_values = torch.zeros((*mem_dim, 1), device=self.device)
         mem_advantages = torch.zeros((*mem_dim, 1), device=self.device)
 
-        for iteration in range(count_of_iterations):
+        for iteration in range(self.start_iteration_value, self.start_iteration_value + count_of_iterations):
             for step in range(count_of_steps):
                 observations = [conn.recv() for conn in connections]
                 observations = torch.stack(observations).to(self.device)
@@ -236,7 +252,7 @@ class Agent:
             avg_score, best_score = score.mean()
             print('iteration: ', iteration, '\taverage score: ', avg_score)
             if best_score:
-                print('New best avg 84score has been achieved', avg_score)
+                print('New best avg score has been achieved', avg_score)
                 torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
 
             mem_observations = mem_observations.view(-1, *(input_dim,))
@@ -317,5 +333,6 @@ class Agent:
         for process in processes:
             process.join()
 
-    def load_model(self, path):
+    def load_model(self, path, par_start_iter_number: int):
         self.model.load_state_dict(torch.load(path))
+        self.start_iteration_value = par_start_iter_number

@@ -1,13 +1,11 @@
 import multiprocessing
 import time
 
-import numpy as np
 import torch
 
 from absl import flags
 
-from Utils.controls import Controls
-from Game import Game
+from Utils.singleton.controls import Controls
 
 FLAGS = flags.FLAGS
 FLAGS([''])
@@ -27,7 +25,7 @@ class Env:
 
     default_settings = {
         'step_mul': 0,
-        'game_steps_per_episode': 0,
+        'game_steps_per_episode': 100,
         'visualize': True,
         'realtime': False
     }
@@ -41,6 +39,7 @@ class Env:
         self.env = None
         self.action_counter = 0
         self.controls = Controls()
+        self.game_steps_per_episode: int = self.default_settings['game_steps_per_episode']
 
         self.a_queue_agent_inputs = par_queue_env_inputs
         self.a_queue_game_vars = par_queue_game_vars
@@ -79,12 +78,14 @@ class Env:
         self.a_queue_game_vars.put(tmp_queue_game_inputs)
         self.a_reward = 0
 
+        self.controls.a_is_executing_critical_action = True
         self.a_queue_restart_game_input.put(True)
         print("Restart Initiated")
         while not self.a_queue_restart_game_input.empty():
             print("Waiting For Game To Restart")
             time.sleep(1)
         self.a_step_counter = 0
+        self.controls.a_is_executing_critical_action = False
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
@@ -134,39 +135,28 @@ class Env:
         self.update_lap_curr(tmp_lap_progress)
 
         # Offset Reward
-        if 1 < tmp_car_distance_offset <= 10:
-            # Negative Reward - Offset Between - < 1, 10 )
-            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - 1) / 10
-            reward += (tmp_normalized_offset_div_10 / 255) * -1
-
-        elif -1 > tmp_car_distance_offset >= -10:
+        if -1 > tmp_car_distance_offset >= -10:
             # Negative Reward - Offset Between - ( -10, -1 >
-            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 10
+            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 9
             reward += tmp_normalized_offset_div_10 / 255
-        elif tmp_car_distance_offset > 10 or tmp_car_distance_offset < -10:
+        elif tmp_car_distance_offset < -10:
             # Negative Reward - Offset Greater Than 10 or Lower Than -10
             reward += -1 / 255
-
-        elif 1 >= tmp_car_distance_offset > 0:
+        elif tmp_car_distance_offset >= 0:
             # Positive Reward - Offset <0, 1>
-            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
-
+            reward += (1 / 255)
         elif -1 <= tmp_car_distance_offset < 0:
             # Positive Reward - Offset <-1, 0>
-            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
-
-        else:
-            # Positive Reward - Offset Equals 0
-            reward += ((1 - abs(tmp_car_distance_offset)) / 255)
+            reward += ((1 + abs(tmp_car_distance_offset)) / 255)
 
         new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
                                   tmp_lap_progress, tmp_car_direction_offset])
         print("Rewardo: " + str(reward))
         self.a_reward = reward
         self.a_step_counter += 1
-        if self.a_step_counter >= 500 or tmp_lap_progress >= 10:
+        if self.a_step_counter >= self.game_steps_per_episode or tmp_lap_progress >= 10:
             terminal = True
-            if self.a_step_counter >= 500:
+            if self.a_step_counter >= self.game_steps_per_episode:
                 print("Exceeded Step Limit")
             if tmp_lap_progress >= 10:
                 print("Lap Complete")
@@ -176,6 +166,7 @@ class Env:
 
     def take_action(self, action, par_sleep_time: float = 1) -> int:
         print("Akcia")
+        self.controls.ReleaseAllKeys()
         if action == 0:
             self.controls.Forward(par_sleep_time)
         elif action == 1:

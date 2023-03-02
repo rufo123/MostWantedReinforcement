@@ -34,7 +34,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
                par_queue_restart_game_input: multiprocessing.Queue) -> None:
     settings = {
         'create_scatter_plot': False,
-        'load_previous_model': False
+        'load_previous_model': True
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('device: ', device)
@@ -48,8 +48,8 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
     count_of_iterations = 20000
     count_of_processes = 1
     count_of_envs = 1
-    count_of_steps = 500
-    batch_size = 500
+    count_of_steps = 100
+    batch_size = 100
 
     count_of_epochs = 4
     lr = 2.5e-4
@@ -60,7 +60,8 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
 
     path_logs_score = path + 'logs_score_results.txt'
 
-    path_model = path + 'model4.pt'
+    tmp_model_start_iter_number: int = 180
+    path_model = path + 'model' + str(tmp_model_start_iter_number) + '.pt'
 
     if os.path.isdir(path):
         print('directory has already existed')
@@ -85,8 +86,9 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
                   device=device, path=path)
 
     # Loading Existing Model
+
     if settings.get('load_previous_model'):
-        agent.load_model(path_model)
+        agent.load_model(path_model, tmp_model_start_iter_number + 1)
 
     iteration_number = 0
     open(path + 'times_rudolf_1.txt', "w").close()
@@ -142,9 +144,11 @@ if __name__ == '__main__':
     tmp_queue_restart_game_input: multiprocessing.Queue = multiprocessing.Queue()
 
     tmp_game_thread = multiprocessing.Process(target=game_loop_thread,
-                                              args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs, tmp_queue_restart_game_input))
+                                              args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs,
+                                                    tmp_queue_restart_game_input))
     tmp_agent_thread = multiprocessing.Process(target=agent_loop,
-                                               args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs, tmp_queue_restart_game_input))
+                                               args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs,
+                                                     tmp_queue_restart_game_input))
 
     tmp_game_thread.start()
     tmp_agent_thread.start()
