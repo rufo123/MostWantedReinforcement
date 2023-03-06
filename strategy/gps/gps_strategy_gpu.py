@@ -14,4 +14,3 @@ class GPSStrategyGPU(AGPSStrategy):
         ret, tmp_threshold_gpu = cv2.cuda.threshold(gps_image, 236, 255, 0)
         tmp_threshold = tmp_threshold_gpu.download()
         return self._make_gps_contour_core(tmp_threshold, screenshot_to_draw, gps_center)
-

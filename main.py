@@ -1,37 +1,43 @@
-import os
 import multiprocessing
-
-import torch
-import graph.make_graph
-
-from Game import Game
-from Speedometer import Speedometer
-from Utils.stats import write_to_file
-from models.short_race import PolicyValueModel
-
 import os
-import sys
-import torch
-import plotly.graph_objects as go
-import graph.make_graph
-from torch.multiprocessing import set_start_method
-from agents.ppo import Agent
-from envs.short_race_env import create_env
 import time
 
-from multiprocessing import Manager
+import torch
+
+import graph.make_graph
+from agents.ppo import Agent
+from envs.short_race_env import create_env
+from game import Game
+from game_inputs import GameInputs
+from models.short_race import PolicyValueModel
+from utils.stats import write_to_file
 
 
-def game_loop_thread(par_queue_agent_inputs: multiprocessing.Queue,
-                     par_queue_game_started_inputs: multiprocessing.Queue,
-                     par_queue_restart_game_input: multiprocessing.Queue) -> None:
+def game_loop_thread(par_game_inputs: GameInputs) -> None:
+    """
+    A function representing a thread that runs the game loop.
+
+    Args:
+        par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for the game.
+
+    Returns:
+        None: This function doesn't return anything.
+    """
     tmp_game: Game = Game()
-    tmp_game.main_loop(par_queue_agent_inputs, par_queue_game_started_inputs, par_queue_restart_game_input)
+    tmp_game.main_loop(par_game_inputs)
 
 
-def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
-               par_queue_game_started: multiprocessing.Queue,
-               par_queue_restart_game_input: multiprocessing.Queue) -> None:
+def agent_loop(par_game_inputs: GameInputs) -> None:
+    """
+    A function representing the agent loop.
+
+    Args:
+        par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
+            the game.
+
+    Returns:
+        None: This function doesn't return anything.
+    """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True
@@ -42,9 +48,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     name = 'test2'
-    env_param1 = par_queue_agent_inputs
-    env_param2 = par_queue_game_started
-    env_param3 = par_queue_restart_game_input
+    env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
     count_of_envs = 1
@@ -52,7 +56,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
     batch_size = 100
 
     count_of_epochs = 4
-    lr = 2.5e-4
+    tmp_learning_rate = 2.5e-4
 
     value_support_size = 1
 
@@ -60,7 +64,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
 
     path_logs_score = path + 'logs_score_results.txt'
 
-    tmp_model_start_iter_number: int = 180
+    tmp_model_start_iter_number: int = 47
     path_model = path + 'model' + str(tmp_model_start_iter_number) + '.pt'
 
     if os.path.isdir(path):
@@ -75,7 +79,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
 
     model = PolicyValueModel(count_of_actions, count_of_features)
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=tmp_learning_rate)
 
     # Drawing Scatter Plot From Existing Data
     if settings.get('create_scatter_plot'):
@@ -94,22 +98,20 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
     open(path + 'times_rudolf_1.txt', "w").close()
     results_time = ''
 
-    tmp_game_variables: tuple = par_queue_game_started.get()
+    tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
 
     tmp_is_game_started: bool = tmp_game_variables[0]
-    tmp_game_speed: int = tmp_game_variables[1]
 
-    par_queue_game_started.put(tmp_game_variables)
+    par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
 
     while not tmp_is_game_started:
         print("Waiting for Race to Initialise")
 
-        tmp_game_variables: tuple = par_queue_game_started.get()
+        tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
 
         tmp_is_game_started: bool = tmp_game_variables[0]
-        tmp_game_speed: int = tmp_game_variables[1]
 
-        par_queue_game_started.put(tmp_game_variables)
+        par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
 
         time.sleep(1)
 
@@ -120,7 +122,7 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
 
         print()
 
-        agent.train(env_param1, env_param2, env_param3, create_env, count_of_actions,
+        agent.train(env_param, create_env, count_of_actions,
                     count_of_iterations=count_of_iterations,
                     count_of_processes=count_of_processes,
                     count_of_envs=count_of_envs,
@@ -139,16 +141,20 @@ def agent_loop(par_queue_agent_inputs: multiprocessing.Queue,
 
 
 if __name__ == '__main__':
+    # graph.make_graph.scatter_plot_show('vysledky.txt')
+
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_restart_game_input: multiprocessing.Queue = multiprocessing.Queue()
 
-    tmp_game_thread = multiprocessing.Process(target=game_loop_thread,
-                                              args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs,
-                                                    tmp_queue_restart_game_input))
-    tmp_agent_thread = multiprocessing.Process(target=agent_loop,
-                                               args=(tmp_queue_env_inputs, tmp_queue_game_started_inputs,
-                                                     tmp_queue_restart_game_input))
+    game_inputs: GameInputs = GameInputs(
+        tmp_queue_env_inputs,
+        tmp_queue_game_started_inputs,
+        tmp_queue_restart_game_input
+    )
+
+    tmp_game_thread = multiprocessing.Process(target=game_loop_thread, args=(game_inputs,))
+    tmp_agent_thread = multiprocessing.Process(target=agent_loop, args=(game_inputs,))
 
     tmp_game_thread.start()
     tmp_agent_thread.start()

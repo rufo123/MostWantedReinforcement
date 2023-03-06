@@ -2,10 +2,11 @@ import multiprocessing
 import time
 
 import torch
-
 from absl import flags
 
-from Utils.singleton.controls import Controls
+from action_translator_enum import ActionTranslatorEnum
+from game_inputs import GameInputs
+from utils.singleton.controls import Controls
 
 FLAGS = flags.FLAGS
 FLAGS([''])
@@ -18,9 +19,7 @@ a_reward: float
 
 
 class Env:
-    a_queue_agent_inputs: multiprocessing.Queue
-    a_queue_game_vars: multiprocessing.Queue
-    a_queue_restart_game_input: multiprocessing.Queue
+    a_game_inputs: GameInputs
     a_step_counter: int
 
     default_settings = {
@@ -30,9 +29,7 @@ class Env:
         'realtime': False
     }
 
-    def __init__(self, par_queue_env_inputs: multiprocessing.Queue,
-                 par_queue_game_vars: multiprocessing.Queue,
-                 par_queue_restart_game_input: multiprocessing.Queue):
+    def __init__(self, par_game_inputs: GameInputs):
         super().__init__()
         self.a_game_speed = None
         self.a_reward = None
@@ -41,20 +38,18 @@ class Env:
         self.controls = Controls()
         self.game_steps_per_episode: int = self.default_settings['game_steps_per_episode']
 
-        self.a_queue_agent_inputs = par_queue_env_inputs
-        self.a_queue_game_vars = par_queue_game_vars
-        self.a_queue_restart_game_input = par_queue_restart_game_input
+        self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
 
     def make_state(self):
         terminal = False
         tmp_reward = self.a_reward
 
-        if self.a_queue_agent_inputs is None:
-            x = 10
+        if self.a_game_inputs.agent_inputs_state is None:
+            pass
         print("Debug Call")
 
-        tmp_tuple_with_values: tuple = self.a_queue_agent_inputs.get()
+        tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]
         tmp_car_distance_offset: float = tmp_tuple_with_values[1]
@@ -70,18 +65,18 @@ class Env:
 
     def reset(self):
         print("Debug Call")
-        self.controls.ReleaseAllKeys()
+        self.controls.release_all_keys()
         state, _, _ = self.make_state()
 
-        tmp_queue_game_inputs: multiprocessing.Queue = self.a_queue_game_vars.get()
+        tmp_queue_game_inputs: multiprocessing.Queue = self.a_game_inputs.game_initialization_inputs.get()
         self.a_game_speed = tmp_queue_game_inputs[1]
-        self.a_queue_game_vars.put(tmp_queue_game_inputs)
+        self.a_game_inputs.game_initialization_inputs.put(tmp_queue_game_inputs)
         self.a_reward = 0
 
         self.controls.a_is_executing_critical_action = True
-        self.a_queue_restart_game_input.put(True)
+        self.a_game_inputs.game_restart_inputs.put(True)
         print("Restart Initiated")
-        while not self.a_queue_restart_game_input.empty():
+        while not self.a_game_inputs.game_restart_inputs.empty():
             print("Waiting For Game To Restart")
             time.sleep(1)
         self.a_step_counter = 0
@@ -103,34 +98,33 @@ class Env:
         # daj progress - +1% - prida reward
         # daj progress - -1% - da pokutu
 
-        tmp_tuple_with_values: tuple = self.a_queue_agent_inputs.get()
+        tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]
         tmp_car_distance_offset: float = tmp_tuple_with_values[1]
         tmp_lap_progress: float = tmp_tuple_with_values[2]
         tmp_car_direction_offset: float = tmp_tuple_with_values[3]
 
-
         # Ako daleko som od idealnej linie?
-
 
         # Fiat Punto Top Speed - 179 # Zatial docasne prec
 
-    # 0 - 50 - Negative Reward ((-1) - 0)
-        #if -1 >= tmp_speed < 50:
-            #reward += (((50 - tmp_speed) / 50) / 255) * -1
-    # 50 - 100 - Positive Reward ( 0 - 1)
-        #elif 50 <= tmp_speed <= 100:
-            #reward += (((tmp_speed - 50) / 50) / 255)
-    # 100 - 179 - Reward 1 - (-1)
-        #else:
-            #reward += (((179 - tmp_speed) / 39.5) - 1) / 255
+        # 0 - 50 - Negative Reward ((-1) - 0)
+        # if -1 >= tmp_speed < 50:
+        # reward += (((50 - tmp_speed) / 50) / 255) * -1
+        # 50 - 100 - Positive Reward ( 0 - 1)
+        # elif 50 <= tmp_speed <= 100:
+        # reward += (((tmp_speed - 50) / 50) / 255)
+        # 100 - 179 - Reward 1 - (-1)
+        # else:
+        # reward += (((179 - tmp_speed) / 39.5) - 1) / 255
 
         # Lap Progress Percent Reward + upravit na presnejsie jednotky
         print("Progress: " + str(self.get_lap_progress_dif(tmp_lap_progress)))
 
         tmp_lap_progress_difference = self.get_lap_progress_dif(tmp_lap_progress)
 
+        # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
         reward += (tmp_lap_progress_difference / 100) / 255
         self.update_lap_curr(tmp_lap_progress)
 
@@ -158,32 +152,16 @@ class Env:
             terminal = True
             if self.a_step_counter >= self.game_steps_per_episode:
                 print("Exceeded Step Limit")
+                self.a_reward += -1
             if tmp_lap_progress >= 10:
+                self.a_reward += 1
                 print("Lap Complete")
             print("Terminal")
 
         return new_state, reward, terminal
 
-    def take_action(self, action, par_sleep_time: float = 1) -> int:
-        print("Akcia")
-        self.controls.ReleaseAllKeys()
-        if action == 0:
-            self.controls.Forward(par_sleep_time)
-        elif action == 1:
-            self.controls.ForwardRight(par_sleep_time)
-        elif action == 2:
-            self.controls.Right(par_sleep_time)
-        elif action == 3:
-            self.controls.BackwardRight(par_sleep_time)
-        elif action == 4:
-            self.controls.Backward(par_sleep_time)
-        elif action == 5:
-            self.controls.BackwardLeft(par_sleep_time)
-        elif action == 6:
-            self.controls.Left(par_sleep_time)
-        else:
-            self.controls.ForwardLeft()
-        return action
+    def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
+        return ActionTranslatorEnum(par_action).take_action(self.controls, par_sleep_time)
 
     def close(self):
         if self.env is not None:
@@ -191,7 +169,5 @@ class Env:
         super().close()
 
 
-def create_env(par_queue_env_inputs: multiprocessing.Queue,
-               par_queue_game_vars: multiprocessing.Queue,
-               par_queue_restart_game_input: multiprocessing.Queue) -> Env:
-    return Env(par_queue_env_inputs, par_queue_game_vars, par_queue_restart_game_input)
+def create_env(par_game_inputs: GameInputs) -> Env:
+    return Env(par_game_inputs)

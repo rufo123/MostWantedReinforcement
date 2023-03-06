@@ -1,13 +1,16 @@
 import math
+
 import numpy as np
+
 
 def write_to_file(log, filename):
     f = open(filename, "w")
     f.write(log)
     f.close()
 
+
 class MovingAverageScore:
-    def __init__(self, count = 100):
+    def __init__(self, count=100):
         self.memory = np.zeros(count)
 
         self.index = 0

@@ -1,6 +1,7 @@
-import plotly.graph_objects as go
-import pandas as pd
 import os
+
+import pandas as pd
+import plotly.graph_objects as go
 
 
 def scatter_plot_show(from_filepath):

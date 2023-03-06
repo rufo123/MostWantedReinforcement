@@ -1,18 +1,17 @@
-import re
+import warnings
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-import graph.make_graph
-import warnings
 from torch.multiprocessing import Process, Pipe
-from Utils.stats import MovingAverageScore, write_to_file
 
-'''
-methods support_to_scalar and scalar_to_support are implemented
-by Davaud Werner in https://github.com/werner-duvaud/muzero-general
-'''
+import graph.make_graph
+from game_inputs import GameInputs
+from utils.stats import MovingAverageScore, write_to_file
 
+
+# methods support_to_scalar and scalar_to_support are implemented
+# by Davaud Werner in https://github.com/werner-duvaud/muzero-general
 
 def support_to_scalar(logits, support_size):
     """
@@ -23,9 +22,9 @@ def support_to_scalar(logits, support_size):
     probabilities = torch.softmax(logits, dim=1)
     support = (
         torch.tensor([x for x in range(-support_size, support_size + 1)])
-            .expand(probabilities.shape)
-            .float()
-            .to(device=probabilities.device)
+        .expand(probabilities.shape)
+        .float()
+        .to(device=probabilities.device)
     )
     x = torch.sum(support * probabilities, dim=1, keepdim=True)
 
@@ -43,7 +42,7 @@ def scalar_to_support(x, support_size):
     Transform a scalar to a categorical representation with (2 * support_size + 1) categories
     See paper appendix Network Architecture
     """
-    # Reduce the scale (defined in https://arxiv.org/abs/1805.11593)
+    # Reduce the par_scale (defined in https://arxiv.org/abs/1805.11593)
     x = torch.sign(x) * (torch.sqrt(torch.abs(x) + 1) - 1) + 0.001 * x
     # Encode on a vector
     x = torch.clamp(x, -support_size, support_size)
@@ -60,9 +59,9 @@ def scalar_to_support(x, support_size):
     return logits
 
 
-def worker(connection, env_param1, env_param2, env_param3, env_func, count_of_iterations, count_of_envs,
+def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
            count_of_steps, gamma, gae_lambda):
-    envs = [env_func(env_param1, env_param2, env_param3) for _ in range(count_of_envs)]
+    envs = [env_func(env_param) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
 
@@ -147,15 +146,14 @@ class Agent:
 
         self.start_iteration_value: int = 0
 
-    def train(self, env_param1, env_param2, env_param3, env_func, count_of_actions,
+    def train(self, env_param: GameInputs, env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
               batch_size=512, input_dim=4):
         """
 
-        :param env_param1: Environment Inputs (Queue)
-        :param env_param2: Game Variables (Queue)
-        :param env_param3: Restart Game Inputs (Queue)
+        :param env_param: An instance of the GameInputs class containing the inputs for the game.
+        :type env_param: GameInputs
         :param env_func: A function that returns the environment to be used for training.
         :param count_of_actions: The number of possible actions in the environment.
         :param count_of_iterations: the number of training iterations to run
@@ -179,7 +177,7 @@ class Agent:
         for _ in range(count_of_processes):
             parr_connection, child_connection = Pipe()
             process = Process(target=worker, args=(
-                child_connection, env_param1, env_param2, env_param3, env_func, count_of_iterations,
+                child_connection, env_param, env_func, count_of_iterations,
                 count_of_envs, count_of_steps, self.gamma, self.gae_lambda))
             connections.append(parr_connection)
             processes.append(process)
@@ -198,7 +196,8 @@ class Agent:
             mem_values = torch.zeros((*mem_dim, 1), device=self.device)
         mem_advantages = torch.zeros((*mem_dim, 1), device=self.device)
 
-        for iteration in range(self.start_iteration_value, self.start_iteration_value + count_of_iterations):
+        for iteration in range(self.start_iteration_value,
+                               self.start_iteration_value + count_of_iterations):
             for step in range(count_of_steps):
                 observations = [conn.recv() for conn in connections]
                 observations = torch.stack(observations).to(self.device)
@@ -264,7 +263,8 @@ class Agent:
             else:
                 mem_values = mem_values.view(-1, 1)
             mem_advantages = mem_advantages.view(-1, 1)
-            mem_advantages = (mem_advantages - mem_advantages.mean()) / (mem_advantages.std() + 1e-5)
+            mem_advantages = (mem_advantages - mem_advantages.mean()) / (
+                        mem_advantages.std() + 1e-5)
 
             s_policy, s_value, s_entropy = 0.0, 0.0, 0.0
 

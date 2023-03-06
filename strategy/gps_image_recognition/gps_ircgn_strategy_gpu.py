@@ -1,19 +1,34 @@
+"""
+This module provides a GPU implementation of a GPS image recognition strategy.
+
+It includes one class:
+- GpsImageRecognitionStrategyCPU: A class that inherits from AGpsImageRecognitionStrategy and
+    implements its methods.
+
+This module depends on the following packages:
+- cv2: An open-source computer vision library.
+- numpy: A package for scientific computing with Python.
+"""
 import cv2
 from numpy import ndarray
 
-from GPS import GPS
+from gps import GPS
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 
 
 class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
-    import time
+    """
+    A class that implements the AGpsImageRecognitionStrategy using a GPU implementation.
+    """
 
     def __init__(self):
+        """
+        Initializes a new instance of the GpsImageRecognitionStrategyGPU class.
+        """
         self.a_car_offset = None
         self.a_width: int = 640
         self.a_height: int = 481
         self.a_channels: int = 3
-
 
         # Create GpuMat objects using pinned memory
         self.a_screen_gpu = cv2.cuda.GpuMat()
@@ -33,7 +48,19 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
         self.a_gps_greyscale_gpu.create(self.a_height, self.a_width, cv2.CV_8UC3)
 
     def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list, int]:
-        time = self.time.time()
+        """
+        Calculates the car offset from the center of the GPS track and the lap progress.
+
+        Args:
+            par_gps (GPS): The GPS object representing the track.
+            par_image (ndarray): The screenshot image.
+
+        Returns:
+            A tuple containing the car offset from the center of the GPS track (float), 
+            the GPS track contour (list), and the car's directional offset from the center 
+            of the track (int).
+        """
+        ...
         # Convert to grayscale and equalize histogram
         self.a_gps_greyscale_gpu = self.make_grayscale(par_image)
         # tmp_gps_final = cv2.equalizeHist(tmp_grayscale)
@@ -55,7 +82,7 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
 
         self.a_gps_gpu = cv2.cuda.bitwise_and(self.a_screen_gpu, self.a_gps_gpu)
 
-        #print(str(self.time.time() - time))
+        # print(str(self.time.time() - time))
 
         # cv2.imshow('Main DKO', self.a_gps_gpu.download())
 
@@ -76,13 +103,23 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
         # Get car offset and lap progress
         tmp_car_offset_dist: float = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
 
-        tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour, tmp_car_pos)
+        tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour,
+                                                                                   tmp_car_pos)
 
         self.a_car_offset = tmp_car_offset_dist
 
         return tmp_car_offset_dist, tmp_contour, tmp_car_directional_offset
 
     def make_grayscale(self, par_image: ndarray) -> cv2.cuda.GpuMat:
+        """
+        Converts the input image to grayscale using a GPU implementation.
+
+        Args:
+            par_image (ndarray): The input image.
+
+        Returns:
+            The grayscale image as a GpuMat object.
+        """
         # grayscale = cv2.cvtColor(par_image, cv2.COLOR_BGR2GRAY)
         # return cv2.GaussianBlur(grayscale, (5, 5), 0)
 
@@ -90,11 +127,13 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
         self.a_gps_greyscale_helper.upload(par_image)
 
         # Convert image to grayscale
-        self.a_gps_greyscale_helper = cv2.cuda.cvtColor(self.a_gps_greyscale_helper, cv2.COLOR_BGR2GRAY)
+        self.a_gps_greyscale_helper = cv2.cuda.cvtColor(self.a_gps_greyscale_helper,
+                                                        cv2.COLOR_BGR2GRAY)
 
         # Create Gaussian filter and apply to the grayscale image
         self.a_gps_blur_helper = cv2.cuda.createGaussianFilter(self.a_gps_greyscale_helper.type(),
-                                                               self.a_gps_greyscale_helper.type(), (5, 5), 0).apply(
+                                                               self.a_gps_greyscale_helper.type(),
+                                                               (5, 5), 0).apply(
             self.a_gps_greyscale_helper)
 
         # Download the blurred image from GPU and return

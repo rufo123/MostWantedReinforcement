@@ -1,11 +1,17 @@
+""" Module providing Abstract Base Classes"""
 from abc import ABC, abstractmethod
+
 import cv2
 from numpy import ndarray
 
-from GPS import GPS
+from gps import GPS
 
 
 class AGpsImageRecognitionStrategy(ABC):
+    """
+    Abstract base class for implementing a strategy to recognize the position
+    of a car in a racing game based on GPS data and a screenshot of the game.
+    """
     @abstractmethod
     def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list, int]:
         """
@@ -13,7 +19,6 @@ class AGpsImageRecognitionStrategy(ABC):
         :param par_gps: The GPS Class
         :param par_image: Screenshot of Game Screen as ndarray
         """
-        pass
 
     @abstractmethod
     def make_grayscale(self, par_image: ndarray) -> cv2.cuda.GpuMat:
@@ -22,4 +27,3 @@ class AGpsImageRecognitionStrategy(ABC):
         and then does also GaussianBlur
         :param par_image: Screenshot of Game Screen as ndarray
         """
-        pass
