@@ -1,4 +1,6 @@
+import pickle
 import warnings
+from datetime import datetime
 
 import numpy as np
 import torch
@@ -74,6 +76,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
         mem_non_terminals = torch.ones((count_of_steps, count_of_envs, 1))
         scores = []
         for step in range(count_of_steps):
+            print("STEP: " + str(step))
             connection.send(observations.float())
             logits, values = connection.recv()
             probs = F.softmax(logits, dim=-1)
@@ -145,6 +148,10 @@ class Agent:
         self.value_support_interval = value_support_size * 2 + 1
 
         self.start_iteration_value: int = 0
+        
+        self.loaded_score_path: str = ""
+
+        self.start_time = datetime.now()
 
     def train(self, env_param: GameInputs, env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
@@ -166,10 +173,15 @@ class Agent:
         """
         print('Training is starting')
 
-        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score'
+        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took'
         logs_loss = 'iteration,episode,policy,value,entropy'
 
         score = MovingAverageScore()
+        
+        if self.loaded_score_path != "":
+            with open(self.loaded_score_path, "rb") as loaded_score:
+                pickle.load(loaded_score)
+        
         buffer_size = count_of_processes * count_of_envs * count_of_steps
         batches_per_iteration = count_of_epochs * buffer_size / batch_size
 
@@ -185,9 +197,6 @@ class Agent:
 
         mem_dim = (count_of_processes, count_of_steps, count_of_envs)
         mem_observations = torch.zeros((mem_dim + (input_dim,)), device=self.device)
-        # mem_observations = torch.zeros((mem_dim + input_dim), device=self.device)
-        # mem_observations = torch.zeros((mem_dim, input_dim), device=self.device)
-        # mem_observations = torch.zeros((mem_dim, input_dim), dtype=torch.float, device=self.device)
         mem_actions = torch.zeros((*mem_dim, 1), device=self.device, dtype=torch.long)
         mem_log_probs = torch.zeros((*mem_dim, 1), device=self.device)
         if self.support_to_value:
@@ -253,6 +262,8 @@ class Agent:
             if best_score:
                 print('New best avg score has been achieved', avg_score)
                 torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
+                with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
+                    pickle.dump(score, loaded_score)
 
             mem_observations = mem_observations.view(-1, *(input_dim,))
             mem_actions = mem_actions.view(-1, 1)
@@ -264,7 +275,7 @@ class Agent:
                 mem_values = mem_values.view(-1, 1)
             mem_advantages = mem_advantages.view(-1, 1)
             mem_advantages = (mem_advantages - mem_advantages.mean()) / (
-                        mem_advantages.std() + 1e-5)
+                    mem_advantages.std() + 1e-5)
 
             s_policy, s_value, s_entropy = 0.0, 0.0, 0.0
 
@@ -310,10 +321,14 @@ class Agent:
                 mem_values = mem_values.view((*mem_dim, 1))
             mem_advantages = mem_advantages.view((*mem_dim, 1))
 
+            elapsed_time = datetime.now() - self.start_time
+            hours_taken = elapsed_time.total_seconds() / 3600
+
             logs_score += '\n' + str(iteration) + ',' \
                           + str(score.get_count_of_episodes()) + ',' \
                           + str(avg_score) + ',' \
-                          + str(score.get_best_avg_score())
+                          + str(score.get_best_avg_score()) + ',' \
+                          + str(round(hours_taken, 2))
 
             logs_loss += '\n' + str(iteration) + ',' \
                          + str(avg_score) + ',' \
@@ -325,6 +340,7 @@ class Agent:
                 write_to_file(logs_score, self.path + 'logs_score.txt')
                 write_to_file(logs_loss, self.path + 'logs_loss.txt')
                 graph.make_graph.scatter_plot_save(self.path + 'logs_score.txt', self.path)
+                torch.save(self.model.state_dict(), self.path + 'latest_model' + '.pt')
 
         print('Training has ended, best avg score is ', score.get_best_avg_score())
 
@@ -334,5 +350,6 @@ class Agent:
             process.join()
 
     def load_model(self, path, par_start_iter_number: int):
-        self.model.load_state_dict(torch.load(path))
-        self.start_iteration_value = par_start_iter_number
+        self.model.load_state_dict(torch.load(path + 'model' + str(par_start_iter_number) + '.pt'))
+        self.loaded_score_path = path + 'score' + str(par_start_iter_number)
+        self.start_iteration_value = par_start_iter_number + 1

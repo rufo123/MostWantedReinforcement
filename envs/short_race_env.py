@@ -24,7 +24,7 @@ class Env:
 
     default_settings = {
         'step_mul': 0,
-        'game_steps_per_episode': 100,
+        'game_steps_per_episode': 150,
         'visualize': True,
         'realtime': False
     }
@@ -123,25 +123,27 @@ class Env:
         print("Progress: " + str(self.get_lap_progress_dif(tmp_lap_progress)))
 
         tmp_lap_progress_difference = self.get_lap_progress_dif(tmp_lap_progress)
+        
+        tmp_normalization_value: int = self.game_steps_per_episode
 
         # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
-        reward += (tmp_lap_progress_difference / 100) / 255
+        reward += (tmp_lap_progress_difference / tmp_normalization_value)
         self.update_lap_curr(tmp_lap_progress)
 
         # Offset Reward
         if -1 > tmp_car_distance_offset >= -10:
             # Negative Reward - Offset Between - ( -10, -1 >
             tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 9
-            reward += tmp_normalized_offset_div_10 / 255
+            reward += tmp_normalized_offset_div_10 / tmp_normalization_value
         elif tmp_car_distance_offset < -10:
             # Negative Reward - Offset Greater Than 10 or Lower Than -10
-            reward += -1 / 255
+            reward += -1 / tmp_normalization_value
         elif tmp_car_distance_offset >= 0:
             # Positive Reward - Offset <0, 1>
-            reward += (1 / 255)
+            reward += (1 / tmp_normalization_value)
         elif -1 <= tmp_car_distance_offset < 0:
             # Positive Reward - Offset <-1, 0>
-            reward += ((1 + abs(tmp_car_distance_offset)) / 255)
+            reward += ((1 + abs(tmp_car_distance_offset)) / tmp_normalization_value)
 
         new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
                                   tmp_lap_progress, tmp_car_direction_offset])

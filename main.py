@@ -40,20 +40,26 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     """
     settings = {
         'create_scatter_plot': False,
-        'load_previous_model': True
+        'load_previous_model': False,
+        'previous_model_iter_number': 0
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print('device: ', device)
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'test2'
+    name = 'second_iteration_training'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
     count_of_envs = 1
-    count_of_steps = 100
-    batch_size = 100
+    count_of_steps = 150
+    # the batch size needs to be a factor or divisor of 'count_of_steps' for it to work properly.
+    # Choosing batch sizes that are multiples or factors of the step count can help ensure that the
+    # batches align properly with the steps, preventing issues with the input size.
+    # Factors and Divisors of 150:
+    # [1, 2, 3, 5, 6, 10, 15, 25, 30, 50, 75, 150]
+    batch_size = 150
 
     count_of_epochs = 4
     tmp_learning_rate = 2.5e-4
@@ -63,9 +69,6 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     path = 'results/short_race/' + name + '/'
 
     path_logs_score = path + 'logs_score_results.txt'
-
-    tmp_model_start_iter_number: int = 47
-    path_model = path + 'model' + str(tmp_model_start_iter_number) + '.pt'
 
     if os.path.isdir(path):
         print('directory has already existed')
@@ -92,7 +95,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     # Loading Existing Model
 
     if settings.get('load_previous_model'):
-        agent.load_model(path_model, tmp_model_start_iter_number + 1)
+        agent.load_model(path, settings.get('previous_model_iter_number'))
 
     iteration_number = 0
     open(path + 'times_rudolf_1.txt', "w").close()
@@ -113,15 +116,14 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
         par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
 
-        time.sleep(1)
+    time.sleep(1)
 
-    for i in range(count_of_iterations):
-        iteration_number = iteration_number + 1
-        time_started = time.perf_counter()
-        count_of_iterations = 106
+    iteration_number = iteration_number + 1
+    time_started = time.perf_counter()
 
-        print()
+    print()
 
+    try:
         agent.train(env_param, create_env, count_of_actions,
                     count_of_iterations=count_of_iterations,
                     count_of_processes=count_of_processes,
@@ -129,14 +131,16 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
                     count_of_steps=count_of_steps,
                     count_of_epochs=count_of_epochs,
                     batch_size=batch_size, input_dim=dim1)
-        # except Exception as e:
-        #     i = i - 1
-        #     continue
-        time.sleep(3)
-        time_elapsed = time.perf_counter() - time_started
-        results_time += '\n' + str(iteration_number) + ',' + str(time_elapsed)
-        write_to_file(results_time, path + 'times_rudolf_1.txt')
-        print("Elapsed: " + str(time_elapsed))
+    except Exception as e:
+        print("An exception occurred during training:", str(e))
+    # except Exception as e:
+    #     i = i - 1
+    #     continue
+    time.sleep(3)
+    time_elapsed = time.perf_counter() - time_started
+    results_time += '\n' + str(iteration_number) + ',' + str(time_elapsed)
+    write_to_file(results_time, path + 'times_rudolf_1.txt')
+    print("Elapsed: " + str(time_elapsed))
     write_to_file(results_time, path + 'times_rudolf_1.txt')
 
 

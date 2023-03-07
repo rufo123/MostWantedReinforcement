@@ -23,11 +23,11 @@ from PIL import Image
 from cv2 import cuda
 from numpy import ndarray
 
+from game_inputs import GameInputs
 from gps import GPS
 from lap_progress import LapProgress
 from lap_time import LapTime
 from speedometer import Speedometer
-from game_inputs import GameInputs
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
@@ -172,7 +172,11 @@ class Game:
 
         self.init_game_memory_objects()
 
-        self.init_game_race(0.7 / float(self.a_speed), 0.1 / float(self.a_speed))
+        self.reconfigure_speed(4)
+
+        self.init_game_race(0.7 / float(4), 0.1 / float(4))
+
+        self.reconfigure_speed(self.a_speed)
 
         time.sleep(3)
 
@@ -612,6 +616,23 @@ class Game:
         # Find the control by its name
         control = main_window.child_window(title="Enable Speedhack")
         control.click_input()
+
+        speed_edit = main_window.child_window(class_name="Edit", found_index=0)
+        speed_edit.set_edit_text(par_speed)
+
+        speed_edit = main_window.child_window(title="Apply")
+        speed_edit.click()
+        
+    def reconfigure_speed(self, par_speed: int):
+        """
+        Reconfigures The Game Speed via Already Running Cheat Engine
+        The Speed increases the Tick Rate of the Game.
+        Meaning everything will be sped up.
+        :param par_speed: Speed to set described as integer
+        """
+        app = pywinauto.Application().connect(title="Cheat Engine 7.4", found_index=1)
+
+        main_window = app.window(title="Cheat Engine 7.4", found_index=0)
 
         speed_edit = main_window.child_window(class_name="Edit", found_index=0)
         speed_edit.set_edit_text(par_speed)
