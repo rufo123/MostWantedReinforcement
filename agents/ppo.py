@@ -1,3 +1,16 @@
+"""
+ppo_agent.py - Proximal Policy Optimization (PPO) Agent
+
+This module provides a PPO agent implementation that can be used to solve
+reinforcement learning problems.
+
+The PPO algorithm is a policy gradient method that is designed to be stable
+and sample-efficient, making it a popular choice for deep reinforcement
+learning problems. It uses a clipped surrogate objective function to update
+the policy parameters and an entropy bonus to encourage exploration.
+
+"""
+
 import pickle
 import warnings
 from datetime import datetime
@@ -341,6 +354,8 @@ class Agent:
                 write_to_file(logs_loss, self.path + 'logs_loss.txt')
                 graph.make_graph.scatter_plot_save(self.path + 'logs_score.txt', self.path)
                 torch.save(self.model.state_dict(), self.path + 'latest_model' + '.pt')
+                with open(self.path + 'latest_score', "wb") as loaded_score:
+                    pickle.dump(score, loaded_score)
 
         print('Training has ended, best avg score is ', score.get_best_avg_score())
 

@@ -116,7 +116,7 @@ class Env:
         # elif 50 <= tmp_speed <= 100:
         # reward += (((tmp_speed - 50) / 50) / 255)
         # 100 - 179 - Reward 1 - (-1)
-        # else:
+        # else:sd
         # reward += (((179 - tmp_speed) / 39.5) - 1) / 255
 
         # Lap Progress Percent Reward + upravit na presnejsie jednotky
@@ -127,7 +127,8 @@ class Env:
         tmp_normalization_value: int = self.game_steps_per_episode
 
         # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
-        reward += (tmp_lap_progress_difference / tmp_normalization_value)
+        if tmp_lap_progress_difference > 0:
+            reward += (tmp_lap_progress_difference / tmp_normalization_value)
         self.update_lap_curr(tmp_lap_progress)
 
         # Offset Reward
@@ -138,12 +139,11 @@ class Env:
         elif tmp_car_distance_offset < -10:
             # Negative Reward - Offset Greater Than 10 or Lower Than -10
             reward += -1 / tmp_normalization_value
-        elif tmp_car_distance_offset >= 0:
+        #elif tmp_car_distance_offset >= 0:
             # Positive Reward - Offset <0, 1>
-            reward += (1 / tmp_normalization_value)
-        elif -1 <= tmp_car_distance_offset < 0:
+            #reward += (1 / tmp_normalization_value)
+        #elif -1 <= tmp_car_distance_offset < 0:
             # Positive Reward - Offset <-1, 0>
-            reward += ((1 + abs(tmp_car_distance_offset)) / tmp_normalization_value)
 
         new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
                                   tmp_lap_progress, tmp_car_direction_offset])
