@@ -1,3 +1,6 @@
+"""
+The `short_race_env` module provides an environment for playing a game using OpenAI's Gym library
+"""
 import multiprocessing
 import time
 
@@ -18,7 +21,11 @@ a_game_speed: float
 a_reward: float
 
 
+# pylint: disable=too-many-instance-attributes
 class Env:
+    """
+    Environment class for RL training.
+    """
     a_game_inputs: GameInputs
     a_step_counter: int
 
@@ -30,6 +37,12 @@ class Env:
     }
 
     def __init__(self, par_game_inputs: GameInputs):
+        """
+        Initializes an instance of the Env class.
+
+        Args:
+        par_game_inputs: A GameInputs object representing the input to the game.
+        """
         super().__init__()
         self.a_game_speed = None
         self.env = None
@@ -41,6 +54,12 @@ class Env:
         self.a_lap_percent_curr = 0.00
 
     def make_state(self):
+        """
+        Generates the state tuple to be used in the next step of the environment.
+
+        Returns:
+        A tuple representing the state of the environment.
+        """
         terminal = False
         tmp_reward: float = 0
         if self.a_game_inputs.agent_inputs_state is None:
@@ -62,11 +81,18 @@ class Env:
         return state, tmp_reward, terminal
 
     def reset(self):
+        """
+        Resets the environment to its initial state.
+
+        Returns:
+        A numpy array representing the initial state of the environment.
+        """
         print("Debug Call")
         self.controls.release_all_keys()
         state, _, _ = self.make_state()
 
-        tmp_queue_game_inputs: multiprocessing.Queue = self.a_game_inputs.game_initialization_inputs.get()
+        tmp_queue_game_inputs: multiprocessing.Queue = \
+            self.a_game_inputs.game_initialization_inputs.get()
         self.a_game_speed = tmp_queue_game_inputs[1]
         self.a_game_inputs.game_initialization_inputs.put(tmp_queue_game_inputs)
 
@@ -81,12 +107,37 @@ class Env:
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
+        """
+        Returns the difference between the current lap progress and the new lap progress.
+
+        Args:
+        par_lap_progress: A float representing the current lap progress.
+
+        Returns:
+        A float representing the difference between the current lap progress and the new 
+            lap progress.
+        """
         return round(par_lap_progress - self.a_lap_percent_curr, 2)
 
     def update_lap_curr(self, par_new_lap_percent: float) -> None:
+        """
+        Updates the current lap progress.
+
+        Args:
+        par_new_lap_percent: A float representing the new lap progress.
+        """
         self.a_lap_percent_curr = par_new_lap_percent
 
     def step(self, action):
+        """
+        Takes an action in the environment and returns the next state, reward, and done flag.
+
+        Args:
+        action: An integer representing the action to take.
+
+        Returns:
+        A tuple containing the next state, reward, and done flag.
+        """
         print("Step")
         terminal = False
         reward: float = 0
@@ -120,7 +171,6 @@ class Env:
         print("Progress: " + str(self.get_lap_progress_dif(tmp_lap_progress)))
 
         tmp_lap_progress_difference = self.get_lap_progress_dif(tmp_lap_progress)
-        
         tmp_normalization_value: int = self.game_steps_per_episode
 
         # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
@@ -158,13 +208,29 @@ class Env:
         return new_state, reward, terminal
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
+        """
+        Takes an action in the game environment.
+
+        :param par_action: The action to take.
+        :param par_sleep_time: The time to sleep after the action is taken.
+        :return: The current score after the action is taken.
+        """
         return ActionTranslatorEnum(par_action).take_action(self.controls, par_sleep_time)
 
     def close(self):
+        """
+        Closes the game environment.
+        """
         if self.env is not None:
             self.env.close()
-        super().close()
+        super().close()  # pylint: disable=no-member
 
 
 def create_env(par_game_inputs: GameInputs) -> Env:
+    """
+    Creates a game environment for playing the game.
+
+    :param par_game_inputs: The game inputs for the environment.
+    :return: An instance of the game environment.
+    """
     return Env(par_game_inputs)

@@ -1,3 +1,10 @@
+"""
+This module implements utilities for working with the distributional RL algorithm,
+including functions to convert between scalar and categorical representations of
+value distributions and an implementation of the Proximal Policy Optimization (PPO)
+algorithm.
+"""
+
 import pickle
 import warnings
 from datetime import datetime
@@ -15,54 +22,73 @@ from utils.stats import MovingAverageScore, write_to_file
 # methods support_to_scalar and scalar_to_support are implemented
 # by Davaud Werner in https://github.com/werner-duvaud/muzero-general
 
-def support_to_scalar(logits, support_size):
+def support_to_scalar(par_logits, par_support_size):
     """
     Transform a categorical representation to a scalar
     See paper appendix Network Architecture
     """
     # Decode to a scalar
-    probabilities = torch.softmax(logits, dim=1)
-    support = (
-        torch.tensor([x for x in range(-support_size, support_size + 1)])
-        .expand(probabilities.shape)
-        .float()
-        .to(device=probabilities.device)
-    )
-    x = torch.sum(support * probabilities, dim=1, keepdim=True)
+    probabilities = torch.softmax(par_logits, dim=1)
+
+    support = (torch.tensor(list(range(-par_support_size, par_support_size + 1)))
+               .expand(probabilities.shape)
+               .float()
+               .to(device=probabilities.device))
+
+    x_return = torch.sum(support * probabilities, dim=1, keepdim=True)
 
     # Invert the scaling (defined in https://arxiv.org/abs/1805.11593)
-    x = torch.sign(x) * (
-            ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x) + 1 + 0.001)) - 1) / (2 * 0.001))
+    x_return = torch.sign(x_return) * (
+            ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x_return) + 1 + 0.001)) - 1) / (2 * 0.001))
             ** 2
             - 1
     )
-    return x
+    return x_return
 
 
-def scalar_to_support(x, support_size):
+def scalar_to_support(par_x, par_support_size):
     """
     Transform a scalar to a categorical representation with (2 * support_size + 1) categories
     See paper appendix Network Architecture
     """
     # Reduce the par_scale (defined in https://arxiv.org/abs/1805.11593)
-    x = torch.sign(x) * (torch.sqrt(torch.abs(x) + 1) - 1) + 0.001 * x
+    par_x = torch.sign(par_x) * (torch.sqrt(torch.abs(par_x) + 1) - 1) + 0.001 * par_x
     # Encode on a vector
-    x = torch.clamp(x, -support_size, support_size)
-    floor = x.floor()
-    prob = x - floor
-    logits = torch.zeros(x.shape[0], x.shape[1], 2 * support_size + 1).to(x.device)
+    par_x = torch.clamp(par_x, -par_support_size, par_support_size)
+    floor = par_x.floor()
+    prob = par_x - floor
+    logits = torch.zeros(par_x.shape[0], par_x.shape[1], 2 * par_support_size + 1).to(par_x.device)
     logits.scatter_(
-        2, (floor + support_size).long().unsqueeze(-1), (1 - prob).unsqueeze(-1)
+        2, (floor + par_support_size).long().unsqueeze(-1), (1 - prob).unsqueeze(-1)
     )
-    indexes = floor + support_size + 1
-    prob = prob.masked_fill_(2 * support_size < indexes, 0.0)
-    indexes = indexes.masked_fill_(2 * support_size < indexes, 0.0)
+    indexes = floor + par_support_size + 1
+    prob = prob.masked_fill_(2 * par_support_size < indexes, 0.0)
+    indexes = indexes.masked_fill_(2 * par_support_size < indexes, 0.0)
     logits.scatter_(2, indexes.long().unsqueeze(-1), prob.unsqueeze(-1))
     return logits
 
 
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-locals
+# pylint: disable=unused-variable
 def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
-           count_of_steps, gamma, gae_lambda):
+           count_of_steps, gamma, gae_lambda) -> None:
+    """
+    worker function for Proximal Policy Optimization (PPO) agent training.
+
+    Args:
+    connection (Connection): Connection object for communication with the main process.
+    env_param (dict): A dictionary containing environment parameters.
+    env_func (callable): A callable function that returns an environment.
+    count_of_iterations (int): Number of iterations for training.
+    count_of_envs (int): Number of parallel environments to use.
+    count_of_steps (int): Number of steps for each environment per iteration.
+    gamma (float): Discount factor for rewards.
+    gae_lambda (float): Lambda parameter for generalized advantage estimation.
+
+    Returns:
+    None.
+    """
     envs = [env_func(env_param) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
@@ -124,7 +150,24 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     connection.close()
 
 
+# pylint: disable=too-many-instance-attributes
 class Agent:
+    """
+    A reinforcement learning agent using Proximal Policy Optimization with Generalized Advantage
+        Estimation.
+
+    :param model: The neural network model to use for the agent.
+    :param optimizer: The optimizer to use for training the neural network model.
+    :param gamma: The discount factor for future rewards.
+    :param epsilon: The clip parameter for the PPO loss function.
+    :param coef_value: The coefficient for the value loss in the PPO loss function.
+    :param coef_entropy: The coefficient for the entropy bonus in the PPO loss function.
+    :param gae_lambda: The lambda parameter for Generalized Advantage Estimation.
+    :param path: The path to the directory where training results will be saved.
+    :param device: The device to use for running the neural network model.
+    :param value_support_size: The number of values in the support used for value estimation.
+    """
+
     def __init__(self, model, optimizer, gamma=0.997, epsilon=0.1,
                  coef_value=0.5, coef_entropy=0.001, gae_lambda=0.95,
                  path='results/', device='cpu',
@@ -149,16 +192,20 @@ class Agent:
         self.value_support_interval = value_support_size * 2 + 1
 
         self.start_iteration_value: int = 0
-        
         self.loaded_score_path: str = ""
 
         self.start_time = datetime.now()
 
+    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-statements
     def train(self, env_param: GameInputs, env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
               batch_size=512, input_dim=4):
         """
+        Trains the agent using Proximal Policy Optimization with Generalized Advantage Estimation.
 
         :param env_param: An instance of the GameInputs class containing the inputs for the game.
         :type env_param: GameInputs
@@ -178,11 +225,11 @@ class Agent:
         logs_loss = 'iteration,episode,policy,value,entropy'
 
         score = MovingAverageScore()
-        
+
         if self.loaded_score_path != "":
             with open(self.loaded_score_path, "rb") as loaded_score:
                 pickle.load(loaded_score)
-        
+
         buffer_size = count_of_processes * count_of_envs * count_of_steps
         batches_per_iteration = count_of_epochs * buffer_size / batch_size
 
@@ -342,6 +389,8 @@ class Agent:
                 write_to_file(logs_loss, self.path + 'logs_loss.txt')
                 graph.make_graph.scatter_plot_save(self.path + 'logs_score.txt', self.path)
                 torch.save(self.model.state_dict(), self.path + 'latest_model' + '.pt')
+                with open(self.path + 'latest_score', "wb") as loaded_score:
+                    pickle.dump(score, loaded_score)
 
         print('Training has ended, best avg score is ', score.get_best_avg_score())
 
@@ -351,6 +400,16 @@ class Agent:
             process.join()
 
     def load_model(self, path, par_start_iter_number: int):
+        """
+        Load a PyTorch model from the specified file path and update instance variables.
+
+        Args:
+            path (str): The file path to the saved model.
+            par_start_iter_number (int): The starting iteration number of the model.
+
+        Returns:
+            None
+        """
         self.model.load_state_dict(torch.load(path + 'model' + str(par_start_iter_number) + '.pt'))
         self.loaded_score_path = path + 'score' + str(par_start_iter_number)
         self.start_iteration_value = par_start_iter_number + 1
