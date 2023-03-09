@@ -32,7 +32,6 @@ class Env:
     def __init__(self, par_game_inputs: GameInputs):
         super().__init__()
         self.a_game_speed = None
-        self.a_reward = None
         self.env = None
         self.action_counter = 0
         self.controls = Controls()
@@ -43,8 +42,7 @@ class Env:
 
     def make_state(self):
         terminal = False
-        tmp_reward = self.a_reward
-
+        tmp_reward: float = 0
         if self.a_game_inputs.agent_inputs_state is None:
             pass
         print("Debug Call")
@@ -71,7 +69,6 @@ class Env:
         tmp_queue_game_inputs: multiprocessing.Queue = self.a_game_inputs.game_initialization_inputs.get()
         self.a_game_speed = tmp_queue_game_inputs[1]
         self.a_game_inputs.game_initialization_inputs.put(tmp_queue_game_inputs)
-        self.a_reward = 0
 
         self.controls.a_is_executing_critical_action = True
         self.a_game_inputs.game_restart_inputs.put(True)
@@ -92,7 +89,7 @@ class Env:
     def step(self, action):
         print("Step")
         terminal = False
-        reward = self.a_reward
+        reward: float = 0
         self.take_action(action, 1 / self.a_game_speed)
         # daj off2set
         # daj progress - +1% - prida reward
@@ -147,16 +144,14 @@ class Env:
 
         new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
                                   tmp_lap_progress, tmp_car_direction_offset])
-        print("Rewardo: " + str(reward))
-        self.a_reward = reward
         self.a_step_counter += 1
         if self.a_step_counter >= self.game_steps_per_episode or tmp_lap_progress >= 10:
             terminal = True
             if self.a_step_counter >= self.game_steps_per_episode:
                 print("Exceeded Step Limit")
-                self.a_reward += -1
+                reward += -1
             if tmp_lap_progress >= 10:
-                self.a_reward += 1
+                reward += 1
                 print("Lap Complete")
             print("Terminal")
 

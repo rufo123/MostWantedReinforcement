@@ -91,9 +91,10 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                 observation, reward, terminal = envs[idx].step(actions[idx, 0].item())
                 mem_rewards[step, idx, 0] = reward
                 game_score[idx] += reward
+                print('Single Reward: ' + str(reward))
+                print('Cumulative Reward: ' + str(game_score[idx]))
                 if reward < 0:
                     mem_non_terminals[step, idx, 0] = 0
-
                 if terminal:
                     mem_non_terminals[step, idx, 0] = 0
                     scores.append(game_score[idx])

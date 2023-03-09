@@ -1,13 +1,15 @@
+"""
+Module providing a main.py
+If you are importing this module you are doing something wrong!
+"""
 import multiprocessing
 import os
 import time
-
 import torch
-
 import graph.make_graph
 from agents.ppo import Agent
 from envs.short_race_env import create_env
-from game import Game
+from game_api.game import Game
 from game_inputs import GameInputs
 from models.short_race import PolicyValueModel
 from utils.stats import write_to_file
@@ -18,7 +20,8 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
     A function representing a thread that runs the game loop.
 
     Args:
-        par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for the game.
+        par_game_inputs (GameInputs): An instance of the GameInputs class containing the 
+            inputs for the game.
 
     Returns:
         None: This function doesn't return anything.
@@ -93,7 +96,6 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
                   device=device, path=path)
 
     # Loading Existing Model
-
     if settings.get('load_previous_model'):
         agent.load_model(path, settings.get('previous_model_iter_number'))
 
