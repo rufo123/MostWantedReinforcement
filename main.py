@@ -41,14 +41,14 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     Args:
         par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
             the game.
-
+a
     Returns:
         None: This function doesn't return anything.
     """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 491
+        'previous_model_iter_number': 910
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -74,14 +74,14 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
     value_support_size = 1
 
-    path = 'results/short_race/' + name + '/'
+    path = 'h:/diplomka_vysledky/results/short_race/' + name + '/'
 
     path_logs_score = path + 'logs_score_results.txt'
 
-    if os.path.isdir(path):
+    if os.path.isdir(os.path.abspath(path)):
         print('directory has already existed')
     else:
-        os.mkdir(path)
+        os.mkdir(os.path.abspath(path))
         print('new directory has been created')
 
     dim1 = 4
