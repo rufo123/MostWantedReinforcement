@@ -4,6 +4,7 @@ Module containing weight initialization functions for PyTorch models.
 
 from torch.nn import init
 
+
 def weights_init_xavier(layer):
     """
     Initializes the weights of the layer using the Xavier initialization method.

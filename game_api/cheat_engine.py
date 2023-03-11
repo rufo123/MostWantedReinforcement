@@ -1,8 +1,8 @@
 """
 Module provides functionality to interact with the Cheat Engine application.
 """
-import pywinauto
 import pyautogui
+import pywinauto
 
 
 class CheatEngine:
@@ -40,7 +40,7 @@ class CheatEngine:
 
         window = app.window(title="Cheat Engine 7.4", found_index=0)
         window.set_focus()
-        
+
         # Get the main window of the application
 
         main_window = app.window(title="Cheat Engine 7.4", found_index=0)
