@@ -16,7 +16,7 @@ from torch import nn
 
 from utils.init import init_orthogonal_head, init_orthogonal_features
 
-
+# pylint: disable=too-few-public-methods
 class PolicyValueModel(nn.Module):
     """
     A neural network model that outputs policy and value predictions from input states.
