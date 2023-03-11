@@ -16,19 +16,27 @@ from gps import GPS
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 
 
+# pylint: disable=too-many-instance-attributes
 class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
     """
     A class that implements the AGpsImageRecognitionStrategy using a GPU implementation.
     """
 
+    a_car_offset: float
+    a_width: int
+    a_height: int
+    a_channels: int
+
     def __init__(self):
         """
         Initializes a new instance of the GpsImageRecognitionStrategyGPU class.
         """
+
+        # noinspection PyTypeChecker
         self.a_car_offset = None
-        self.a_width: int = 640
-        self.a_height: int = 481
-        self.a_channels: int = 3
+        self.a_width = 640
+        self.a_height = 481
+        self.a_channels = 3
 
         # Create GpuMat objects using pinned memory
         self.a_screen_gpu = cv2.cuda.GpuMat()
@@ -60,7 +68,6 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
             the GPS track contour (list), and the car's directional offset from the center 
             of the track (int).
         """
-        ...
         # Convert to grayscale and equalize histogram
         self.a_gps_greyscale_gpu = self.make_grayscale(par_image)
         # tmp_gps_final = cv2.equalizeHist(tmp_grayscale)

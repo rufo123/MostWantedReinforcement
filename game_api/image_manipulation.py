@@ -24,6 +24,7 @@ class ImageManipulation:
 
     def __init__(self):
         pass
+
     def load_comparable_images(self) -> bool:
         """
         Loads Images which are used for comparison e.g. matchTemplate

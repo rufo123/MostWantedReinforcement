@@ -66,6 +66,9 @@ class Env:
             pass
         print("Debug Call")
 
+        while self.a_game_inputs.agent_inputs_state.qsize() == 0:
+            print("Waiting for Game API to send data (Make_State)")
+            time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]
@@ -145,7 +148,9 @@ class Env:
         # daj off2set
         # daj progress - +1% - prida reward
         # daj progress - -1% - da pokutu
-
+        while self.a_game_inputs.agent_inputs_state.qsize() == 0:
+            print("Waiting for Game API to send data (Step)")
+            time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
         tmp_speed: float = tmp_tuple_with_values[0]

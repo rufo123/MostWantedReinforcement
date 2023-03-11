@@ -6,6 +6,9 @@ import pathlib
 import string
 import subprocess
 import time
+# Disable the pylint error for the next line
+# pylint: disable=no-name-in-module
+from queue import Empty
 from typing import Tuple
 
 import cv2
@@ -16,8 +19,6 @@ import win32con
 import win32gui
 import win32ui
 from PIL import Image
-# Disable the pylint error for the next line
-# pylint: disable=no-name-in-module
 from cv2 import cuda
 from numpy import ndarray
 
@@ -25,9 +26,9 @@ from game_api.cheat_engine import CheatEngine
 from game_api.image_manipulation import ImageManipulation
 from game_inputs import GameInputs
 from gps import GPS
-from lap_progress import LapProgress
-from lap_time import LapTime
-from speedometer import Speedometer
+from game_memory_reading.lap_progress import LapProgress
+from game_memory_reading.lap_time import LapTime
+from game_memory_reading.speedometer import Speedometer
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
@@ -250,6 +251,14 @@ class Game:
                                      )
 
             cv2.imshow('Main Vision', self.a_screenshot)
+            image_path = 'h:/diplomka_vysledky/results/short_race/second_iteration_training' \
+                         '/scatter_plot.png'
+            image = None
+            if os.path.exists(os.path.abspath(image_path)):
+                # Load the image
+                image = cv2.imread(os.path.abspath(image_path))
+            if image is not None:
+                cv2.imshow('Graph: ', image)
 
             tmp_frame_counter += tmp_speed_constant
 
@@ -270,8 +279,11 @@ class Game:
             # .empty() returns False or True, it is not function to empty the Queue
             # Maybe some python coders can use function declaration, when they know that it
             # returns bool to use naming like isEmpty? :)
-            while not par_game_inputs.agent_inputs_state.empty():
-                par_game_inputs.agent_inputs_state.get()
+            while not par_game_inputs.agent_inputs_state.qsize() == 0:
+                try:
+                    par_game_inputs.agent_inputs_state.get_nowait()
+                except Empty:
+                    pass  # This case is possible qsize() is unreliable, it is expected behaviour
             par_game_inputs.agent_inputs_state.put(
                 (self.get_speed_mph(), self.get_car_distance_offset(),
                  self.a_lap_progress.return_lap_completed_percent(),
