@@ -14,9 +14,9 @@ def write_to_file(log: str, filename: str):
          log (str): Log string to write to file
          filename (str): Name of the file to write to
      """
-    file = open(filename, "w")
-    file.write(log)
-    file.close()
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(log)
+        file.close()
 
 
 class MovingAverageScore:

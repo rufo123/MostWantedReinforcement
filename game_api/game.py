@@ -26,9 +26,9 @@ from game_api.cheat_engine import CheatEngine
 from game_api.image_manipulation import ImageManipulation
 from game_inputs import GameInputs
 from gps import GPS
-from lap_progress import LapProgress
-from lap_time import LapTime
-from speedometer import Speedometer
+from game_memory_reading.lap_progress import LapProgress
+from game_memory_reading.lap_time import LapTime
+from game_memory_reading.speedometer import Speedometer
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
