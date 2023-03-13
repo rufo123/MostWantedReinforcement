@@ -18,10 +18,12 @@ class FirstRewardStrategy(ARewardStrategy):
     This implementation gives:
      - positive reward for:
         Offset (Distance From Road Centre): <0, 1> and <-1, 0>
+        
         Completing The Race (Partially - 10%)
         
      - negative reward for:
         Offset (Distance From Road Centre): (-10, -1> and (-inf, -10> 
+        
         Not Completing The Race in specified count_of_steps
     """
 
