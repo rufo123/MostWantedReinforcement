@@ -42,13 +42,13 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
         par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
             the game.
 a
-    Returns:
+    Returns:a
         None: This function doesn't return anything.
     """
     settings = {
         'create_scatter_plot': False,
-        'load_previous_model': True,
-        'previous_model_iter_number': 3470
+        'load_previous_model': False,
+        'previous_model_iter_number': 0
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -84,7 +84,7 @@ a
         os.mkdir(os.path.abspath(path))
         print('new directory has been created')
 
-    dim1 = 4
+    dim1 = 25
     count_of_actions = 8
     count_of_features = 8448
 

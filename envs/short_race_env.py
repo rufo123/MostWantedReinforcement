@@ -4,6 +4,7 @@ The `short_race_env` module provides an environment for playing a game using Ope
 import multiprocessing
 import time
 
+import numpy as np
 import torch
 from absl import flags
 
@@ -31,6 +32,7 @@ class Env:
     a_game_inputs: GameInputs
     a_step_counter: int
     a_reward_strategy: ARewardStrategy
+    a_state_matrix: np.ndarray
 
     default_settings = {
         'step_mul': 0,
@@ -58,6 +60,8 @@ class Env:
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
 
+        self.a_state_matrix = np.zeros((5, 5), dtype=float) - 1
+
     def make_state(self):
         """
         Generates the state tuple to be used in the next step of the environment.
@@ -81,8 +85,10 @@ class Env:
         tmp_lap_progress: float = tmp_tuple_with_values[2]
         tmp_car_direction_offset: int = tmp_tuple_with_values[3]
 
-        state = torch.tensor([tmp_speed, tmp_car_distance_offset,
-                              tmp_lap_progress, tmp_car_direction_offset])
+        new_state_input: tuple[float, float, float, float, float] = (
+            -1, tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_car_direction_offset)
+
+        state = self.calculate_state(new_state_input)
 
         state = state.numpy()
 
@@ -177,11 +183,46 @@ class Env:
 
         self.update_lap_curr(tmp_lap_progress)
 
-        new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
-                                  tmp_lap_progress, tmp_car_direction_offset])
+        new_state_input: tuple[float, float, float, float, float] = (
+            action, tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_car_direction_offset)
+        new_state = self.calculate_state(new_state_input)
+
+        # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
+        #                          tmp_lap_progress, tmp_car_direction_offset])
 
         self.a_step_counter += 1
         return new_state, reward, terminal
+
+    def calculate_state(self, par_current_inputs:
+    tuple[float, float, float, float, float]) -> torch.tensor:
+        """
+        Shifts the rows of the state matrix down by one row and inserts the new input parameters
+        in the first row. Prints the updated matrix.
+
+        Args:
+            par_current_inputs: A tuple of 5 float values representing the current
+                input parameters: 
+                    [ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER]
+
+        Returns:
+            Torch Tensor representing state as a tensor
+        """
+        current_inputs_rounded: tuple[float, float, float, float, float] = (
+            par_current_inputs[0],
+            par_current_inputs[1],
+            round(par_current_inputs[2], ndigits=6),
+            par_current_inputs[3],
+            par_current_inputs[4]
+        )
+        # shift the rows down
+        self.a_state_matrix[1:, :] = self.a_state_matrix[:-1, :]
+        # insert the new parameters in the first row
+        self.a_state_matrix[0, :] = current_inputs_rounded
+        # print the updated matrix
+        print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
+        print(self.a_state_matrix)
+
+        return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
         """
