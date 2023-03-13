@@ -8,6 +8,8 @@ import torch
 from absl import flags
 
 from action_translator_enum import ActionTranslatorEnum
+from envs.a_reward_strategy import ARewardStrategy
+from envs.reward_strategy_enum import RewardStrategyEnum
 from game_inputs import GameInputs
 from utils.singleton.controls import Controls
 
@@ -28,12 +30,14 @@ class Env:
     """
     a_game_inputs: GameInputs
     a_step_counter: int
+    a_reward_strategy: ARewardStrategy
 
     default_settings = {
         'step_mul': 0,
         'game_steps_per_episode': 150,
         'visualize': True,
-        'realtime': False
+        'realtime': False,
+        'reward_strategy': RewardStrategyEnum.FIRST_REWARD_STRATEGY
     }
 
     def __init__(self, par_game_inputs: GameInputs):
@@ -49,6 +53,7 @@ class Env:
         self.action_counter = 0
         self.controls = Controls()
         self.game_steps_per_episode: int = self.default_settings['game_steps_per_episode']
+        self.a_reward_strategy = self.default_settings['reward_strategy'].return_strategy()
 
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
@@ -158,58 +163,24 @@ class Env:
         tmp_lap_progress: float = tmp_tuple_with_values[2]
         tmp_car_direction_offset: float = tmp_tuple_with_values[3]
 
-        # Ako daleko som od idealnej linie?
+        tmp_lap_progress_diff: float = self.get_lap_progress_dif(tmp_lap_progress)
 
-        # Fiat Punto Top Speed - 179 # Zatial docasne prec
+        edited_state_tuple: tuple[float, float, float, float, float] = \
+            (tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_lap_progress_diff,
+             tmp_car_direction_offset)
 
-        # 0 - 50 - Negative Reward ((-1) - 0)
-        # if -1 >= tmp_speed < 50:
-        # reward += (((50 - tmp_speed) / 50) / 255) * -1
-        # 50 - 100 - Positive Reward ( 0 - 1)
-        # elif 50 <= tmp_speed <= 100:
-        # reward += (((tmp_speed - 50) / 50) / 255)
-        # 100 - 179 - Reward 1 - (-1)
-        # else:
-        # reward += (((179 - tmp_speed) / 39.5) - 1) / 255
+        new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_state_tuple,
+                                                                      self.game_steps_per_episode,
+                                                                      self.a_step_counter,
+                                                                      terminal)
+        reward += new_reward
 
-        # Lap Progress Percent Reward + upravit na presnejsie jednotky
-        print("Progress: " + str(self.get_lap_progress_dif(tmp_lap_progress)))
-
-        tmp_lap_progress_difference = self.get_lap_progress_dif(tmp_lap_progress)
-        tmp_normalization_value: int = self.game_steps_per_episode
-
-        # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
-        reward += (tmp_lap_progress_difference / tmp_normalization_value)
         self.update_lap_curr(tmp_lap_progress)
-
-        # Offset Reward
-        if -1 > tmp_car_distance_offset >= -10:
-            # Negative Reward - Offset Between - ( -10, -1 >
-            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 9
-            reward += tmp_normalized_offset_div_10 / tmp_normalization_value
-        elif tmp_car_distance_offset < -10:
-            # Negative Reward - Offset Greater Than 10 or Lower Than -10
-            reward += -1 / tmp_normalization_value
-        elif tmp_car_distance_offset >= 0:
-            # Positive Reward - Offset <0, 1>
-            reward += (1 / tmp_normalization_value)
-        elif -1 <= tmp_car_distance_offset < 0:
-            # Positive Reward - Offset <-1, 0>
-            reward += ((1 + abs(tmp_car_distance_offset)) / tmp_normalization_value)
 
         new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
                                   tmp_lap_progress, tmp_car_direction_offset])
-        self.a_step_counter += 1
-        if self.a_step_counter >= self.game_steps_per_episode or tmp_lap_progress >= 10:
-            terminal = True
-            if self.a_step_counter >= self.game_steps_per_episode:
-                print("Exceeded Step Limit")
-                reward += -1
-            if tmp_lap_progress >= 10:
-                reward += 1
-                print("Lap Complete")
-            print("Terminal")
 
+        self.a_step_counter += 1
         return new_state, reward, terminal
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
@@ -221,6 +192,20 @@ class Env:
         :return: The current score after the action is taken.
         """
         return ActionTranslatorEnum(par_action).take_action(self.controls, par_sleep_time)
+
+    def return_steps_count(self) -> int:
+        """
+        Gets: The current count of steps
+        :return: The current count of steps
+        """
+        return self.a_step_counter
+
+    def return_game_steps_per_episode(self) -> int:
+        """
+        Gets: Configured count of game steps per episode
+        :return: configured count of game steps per episode
+        """
+        return self.game_steps_per_episode
 
     def close(self):
         """
