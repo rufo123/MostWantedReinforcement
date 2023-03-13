@@ -1,16 +1,45 @@
+"""
+Module: This module contains a MovingAverageScore class and a write_to_file function for logging.
+"""
 import math
 
 import numpy as np
 
 
-def write_to_file(log, filename):
-    f = open(filename, "w")
-    f.write(log)
-    f.close()
+def write_to_file(log: str, filename: str):
+    """
+     Write log string to file.
+
+     Args:
+         log (str): Log string to write to file
+         filename (str): Name of the file to write to
+     """
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(log)
+        file.close()
 
 
 class MovingAverageScore:
-    def __init__(self, count=100):
+    """
+    Calculates the moving average score over a given window of episodes.
+
+    Attributes:
+        memory: An array that stores the scores.
+        index: The current index of the memory array.
+        memory_size: The size of the memory array.
+        full_memory: A flag indicating whether the memory array is full.
+        best_avg_score: The best average score achieved so far.
+        best_score: The best score achieved so far.
+        count_of_episodes: The total count of episodes seen.
+    """
+
+    def __init__(self, count: int = 100):
+        """
+        Initialize MovingAverageScore class.
+
+        Args:
+            count (int): Number of scores to keep in memory
+        """
         self.memory = np.zeros(count)
 
         self.index = 0
@@ -21,7 +50,13 @@ class MovingAverageScore:
         self.best_score = - math.inf
         self.count_of_episodes = 0
 
-    def add(self, scores):
+    def add(self, scores: np.ndarray):
+        """
+        Add scores to memory.
+
+        Args:
+            scores (numpy.ndarray): Array of scores to add to memory
+        """
         length = len(scores)
         if length > 0:
             scores = np.array(scores)
@@ -47,7 +82,13 @@ class MovingAverageScore:
                 self.index = length_from_start
                 self.full_memory = True
 
-    def mean(self):
+    def mean(self) -> tuple[float, bool]:
+        """
+        Calculate mean score from memory.
+
+        Returns:
+            Tuple[float, bool]: Mean score and whether the best average score was updated
+        """
         if self.full_memory:
             mean = self.memory.mean()
         else:
@@ -61,7 +102,19 @@ class MovingAverageScore:
         return mean, False
 
     def get_best_avg_score(self):
+        """
+        Get the best average score.
+
+        Returns:
+            float: The best average score
+        """
         return self.best_avg_score
 
     def get_count_of_episodes(self):
+        """
+        Get the total count of episodes.
+
+        Returns:
+            int: The count of episodes
+        """
         return self.count_of_episodes

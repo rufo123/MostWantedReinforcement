@@ -6,6 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/venv/Lib/site-packages/cv2" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/venv/Lib/site-packages/cv2/python-3.9" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/results" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (MostWantedReinforcement)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
