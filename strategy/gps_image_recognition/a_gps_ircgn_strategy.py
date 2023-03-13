@@ -12,6 +12,7 @@ class AGpsImageRecognitionStrategy(ABC):
     Abstract base class for implementing a strategy to recognize the position
     of a car in a racing game based on GPS data and a screenshot of the game.
     """
+
     @abstractmethod
     def calc_car_offset(self, par_gps: GPS, par_image: ndarray) -> tuple[float, list, int]:
         """

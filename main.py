@@ -1,3 +1,7 @@
+"""
+Module providing a main.py
+If you are importing this module you are doing something wrong!
+"""
 import multiprocessing
 import os
 import time
@@ -7,7 +11,7 @@ import torch
 import graph.make_graph
 from agents.ppo import Agent
 from envs.short_race_env import create_env
-from game import Game
+from game_api.game import Game
 from game_inputs import GameInputs
 from models.short_race import PolicyValueModel
 from utils.stats import write_to_file
@@ -18,8 +22,8 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
     A function representing a thread that runs the game loop.
 
     Args:
-        par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
-         the game.
+        par_game_inputs (GameInputs): An instance of the GameInputs class containing the 
+            inputs for the game.
 
     Returns:
         None: This function doesn't return anything.
@@ -28,6 +32,8 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
     tmp_game.main_loop(par_game_inputs)
 
 
+# pylint: disable=too-many-locals
+# pylint: disable=too-many-statements
 def agent_loop(par_game_inputs: GameInputs) -> None:
     """
     A function representing the agent loop.
@@ -35,21 +41,22 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     Args:
         par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
             the game.
-
+a
     Returns:
         None: This function doesn't return anything.
     """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 250
+        'previous_model_iter_number': 3470
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(torch.version.cuda)
     print('device: ', device)
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'third_iteration_training'
+    name = 'second_iteration_training'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
@@ -67,14 +74,14 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
     value_support_size = 1
 
-    path = 'results/short_race/' + name + '/'
+    path = 'h:/diplomka_vysledky/results/short_race/' + name + '/'
 
     path_logs_score = path + 'logs_score_results.txt'
 
-    if os.path.isdir(path):
+    if os.path.isdir(os.path.abspath(path)):
         print('directory has already existed')
     else:
-        os.mkdir(path)
+        os.mkdir(os.path.abspath(path))
         print('new directory has been created')
 
     dim1 = 4
@@ -94,12 +101,12 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
                   device=device, path=path)
 
     # Loading Existing Model
-
     if settings.get('load_previous_model'):
         agent.load_model(path, settings.get('previous_model_iter_number'))
 
     iteration_number = 0
-    open(path + 'times_rudolf_1.txt', "w").close()
+    with open(path + 'times_rudolf_1.txt', "w", encoding="utf-8"):
+        pass
     results_time = ''
 
     tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
@@ -132,8 +139,8 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
                     count_of_steps=count_of_steps,
                     count_of_epochs=count_of_epochs,
                     batch_size=batch_size, input_dim=dim1)
-    except Exception as e:
-        print("An exception occurred during training:", str(e))
+    except Exception as exception:  # pylint: disable=broad-except
+        print("An exception occurred during training:", str(exception))
     # except Exception as e:
     #     i = i - 1
     #     continue

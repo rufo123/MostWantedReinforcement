@@ -18,6 +18,7 @@ class AGPSStrategy(ABC):
     """
     Abstract Base Class defining GPS-based strategies for video games.
     """
+
     @abstractmethod
     def get_gps_mask(self, par_greyscale):
         """
