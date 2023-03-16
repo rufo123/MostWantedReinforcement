@@ -19,6 +19,7 @@ import win32con
 import win32gui
 import win32ui
 from PIL import Image
+# noinspection PyProtectedMember
 from cv2 import cuda
 from numpy import ndarray
 
@@ -251,7 +252,7 @@ class Game:
                                      )
 
             cv2.imshow('Main Vision', self.a_screenshot)
-            image_path = 'h:/diplomka_vysledky/results/short_race/second_iteration_training' \
+            image_path = 'h:/diplomka_vysledky/results/short_race/third_iteration_training' \
                          '/scatter_plot.png'
             image = None
             if os.path.exists(os.path.abspath(image_path)):
@@ -340,11 +341,7 @@ class Game:
 
         Args:
             par_image: An ndarray representing the input image.
-            par_font: The font type to use, e.g. cv2.FONT_HERSHEY_SIMPLEX.
-            par_font_scale: The font size to use.
             par_font_color: The color of the font in RGB format.
-            par_thickness: The thickness of the text.
-            par_line_type: The line type of the text.
             par_array_of_text: A numpy ndarray containing the text to be displayed.
 
         Returns:

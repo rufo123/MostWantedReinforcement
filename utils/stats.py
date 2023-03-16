@@ -60,6 +60,7 @@ class MovingAverageScore:
         length = len(scores)
         if length > 0:
             scores = np.array(scores)
+            # noinspection PyArgumentList
             self.best_score = max(self.best_score, scores.max())
             self.count_of_episodes += length
 

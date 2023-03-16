@@ -11,6 +11,7 @@ from datetime import datetime
 
 import numpy as np
 import torch
+# noinspection PyPep8Naming
 import torch.nn.functional as F
 from torch.multiprocessing import Process, Pipe
 
@@ -132,6 +133,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                     observations[idx] = torch.tensor(observation)
 
         connection.send(observations.float())
+        # noinspection PyUnboundLocalVariable
         mem_values[step + 1] = connection.recv()
         mem_rewards = torch.clamp(mem_rewards, -1.0, 1.0)
         advantages = torch.zeros((count_of_steps, count_of_envs, 1))
@@ -364,6 +366,7 @@ class Agent:
             mem_actions = mem_actions.view((*mem_dim, 1))
             mem_log_probs = mem_log_probs.view((*mem_dim, 1))
             if self.support_to_value:
+                # noinspection PyUnusedLocal
                 mem_values = mem_values = mem_values.view((*mem_dim, self.value_support_interval))
             else:
                 mem_values = mem_values.view((*mem_dim, 1))

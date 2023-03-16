@@ -53,8 +53,6 @@ class FirstRewardStrategy(ARewardStrategy):
         tmp_lap_progress_diff: float = par_env_inputs[3]
         # tmp_car_direction_offset = par_env_inputs[4]
 
-        tmp_normalization_value: int = par_game_steps_per_episode
-
         # Ako daleko som od idealnej linie?
 
         # Fiat Punto Top Speed - 179 # Zatial docasne prec
@@ -71,26 +69,9 @@ class FirstRewardStrategy(ARewardStrategy):
 
         tmp_normalization_value: int = par_game_steps_per_episode
 
-        # Lap Progress Percent Reward + upravit na presnejsie jednotky
-        print("Progress: " + str(tmp_lap_progress_diff))
+        reward += self.__lap_progress_reward(tmp_lap_progress_diff, tmp_normalization_value)
 
-        # 255 -  nedelit 2 krat - len raz delit a poctom max stepov
-        reward += (tmp_lap_progress_diff / tmp_normalization_value)
-
-        # Offset Reward
-        if -1 > tmp_car_distance_offset >= -10:
-            # Negative Reward - Offset Between - ( -10, -1 >
-            tmp_normalized_offset_div_10: float = (tmp_car_distance_offset - (-1)) / 9
-            reward += tmp_normalized_offset_div_10 / tmp_normalization_value
-        elif tmp_car_distance_offset < -10:
-            # Negative Reward - Offset Greater Than 10 or Lower Than -10
-            reward += -1 / tmp_normalization_value
-        elif tmp_car_distance_offset >= 0:
-            # Positive Reward - Offset <0, 1>
-            reward += (1 / tmp_normalization_value)
-        elif -1 <= tmp_car_distance_offset < 0:
-            # Positive Reward - Offset <-1, 0>
-            reward += ((1 + abs(tmp_car_distance_offset)) / tmp_normalization_value)
+        reward += self.__distance_offset_reward(tmp_car_distance_offset, tmp_normalization_value)
 
         if par_env_steps_counter >= par_game_steps_per_episode or tmp_lap_progress >= 10:
             terminal = True
@@ -102,3 +83,72 @@ class FirstRewardStrategy(ARewardStrategy):
                 print("Lap Complete")
             print("Terminal")
         return reward, terminal
+
+    def __distance_offset_reward(self, par_car_distance_offset: float,
+                                 par_normalization_value: int) -> float:
+        """
+        Computes the offset reward based on the car's distance offset from the target.
+
+        Args:
+            par_car_distance_offset (float): The car's distance offset from the target.
+                Negative values mean the car is behind the target, positive values mean
+                the car is ahead of the target.
+            par_normalization_value (int): A normalization value used to scale the reward.
+
+        Returns:
+            float: The computed offset reward.
+
+        The offset reward is computed as follows:
+        - If the car's distance offset is between -1 and -10, a negative reward is given
+          proportional to the offset's normalized value divided by the normalization value.
+          The normalized offset is obtained by dividing the offset minus -1 by 9.
+        - If the car's distance offset is lower than -10, a negative reward of -1 divided by
+          the normalization value is given.
+        - If the car's distance offset is between 0 and 1, a positive reward is given
+          proportional to 1 divided by the normalization value.
+        - If the car's distance offset is between -1 and 0, a positive reward is given
+          proportional to (1 + offset) divided by the normalization value.
+        """
+        # Offset Reward
+
+        offset_reward: float = 0
+
+        if -1 > par_car_distance_offset >= -10:
+            # Negative Reward - Offset Between - ( -10, -1 >
+            tmp_normalized_offset_div_10: float = (par_car_distance_offset - (-1)) / 9
+            offset_reward = tmp_normalized_offset_div_10 / par_normalization_value
+        elif par_car_distance_offset < -10:
+            # Negative Reward - Offset Greater Than 10 or Lower Than -10
+            offset_reward = -1 / par_normalization_value
+        elif par_car_distance_offset > 0:
+            # Positive Reward - Offset <0, 1>
+            offset_reward = 1 / par_normalization_value
+        elif -1 <= par_car_distance_offset <= 0:
+            # Positive Reward - Offset (-1, 0)
+            offset_reward = (1 + par_car_distance_offset) / par_normalization_value
+
+        return offset_reward
+
+    def __lap_progress_reward(self, par_lap_progress_diff: float,
+                              par_normalization_value: int) -> float:
+        """
+        Calculates the lap progress reward based on the difference in lap progress
+        between the current and previous time step.
+
+        :param par_lap_progress_diff: A float representing the difference in lap
+            progress between the current and previous time step. The value should
+            be between -1 and 1, where negative values represent falling behind
+            and positive values represent making progress.
+         :param par_normalization_value: An integer representing the normalization
+            value to use in the reward calculation. This value should be greater
+            than zero to avoid division by zero errors.
+
+        :return: A float representing the lap progress reward. The value will be
+            positive if the agent is making progress and negative if the agent
+            is falling behind. The magnitude of the reward will be proportional
+            to the magnitude of the lap progress difference, divided by the
+            normalization value.
+        """
+
+        print("Progress: " + str(par_lap_progress_diff))
+        return par_lap_progress_diff / par_normalization_value

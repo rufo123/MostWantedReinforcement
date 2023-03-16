@@ -107,6 +107,7 @@ class Env:
 
         tmp_queue_game_inputs: multiprocessing.Queue = \
             self.a_game_inputs.game_initialization_inputs.get()
+        # noinspection PyUnresolvedReferences
         self.a_game_speed = tmp_queue_game_inputs[1]
         self.a_game_inputs.game_initialization_inputs.put(tmp_queue_game_inputs)
 
@@ -152,7 +153,8 @@ class Env:
         Returns:
         A tuple containing the next state, reward, and done flag.
         """
-        print("Step")
+        self.a_step_counter += 1
+        print("Step Internal Counter: " + str(self.a_step_counter))
         terminal = False
         reward: float = 0
         self.take_action(action, 1 / self.a_game_speed)
@@ -190,7 +192,6 @@ class Env:
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
         #                          tmp_lap_progress, tmp_car_direction_offset])
 
-        self.a_step_counter += 1
         return new_state, reward, terminal
 
     def calculate_state(self, par_current_inputs:
@@ -219,8 +220,8 @@ class Env:
         # insert the new parameters in the first row
         self.a_state_matrix[0, :] = current_inputs_rounded
         # print the updated matrix
-        print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
-        print(self.a_state_matrix)
+        # print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
+        # print(self.a_state_matrix)
 
         return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
 
