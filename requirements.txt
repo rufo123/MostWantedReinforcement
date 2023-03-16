@@ -7,7 +7,7 @@ keyboard==0.13.5
 Pymem==1.10.0
 Pillow==9.4.0
 PyAutoGUI==0.9.53
-pywin32==305
+pywin32
 pywin32-ctypes==0.2.0
 pywinauto==0.6.8
 opencv-python==4.7.0.*
