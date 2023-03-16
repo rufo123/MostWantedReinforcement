@@ -8,4 +8,4 @@ Pymem==1.10.0
 Pillow==9.4.0
 PyAutoGUI==0.9.53
 pywinauto==0.6.8
-opencv-python==4.7.0 | opencv=4.7.0 | cv2
+opencv-python==4.7.0
