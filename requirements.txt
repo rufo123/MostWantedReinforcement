@@ -1,0 +1,11 @@
+numpy==1.24.2
+torch==1.13.1+cu117
+utils==1.0.1
+pandas==1.5.3
+plotly==5.11.0
+keyboard==0.13.5
+Pymem==1.10.0
+Pillow==9.4.0
+PyAutoGUI==0.9.53
+pywinauto==0.6.8
+opencv-python==4.7.0 | opencv=4.7.0 | cv2
