@@ -230,7 +230,7 @@ class Agent:
 
         if self.loaded_score_path != "":
             with open(self.loaded_score_path, "rb") as loaded_score:
-                pickle.load(loaded_score)
+                score = pickle.load(loaded_score)
 
         buffer_size = count_of_processes * count_of_envs * count_of_steps
         batches_per_iteration = count_of_epochs * buffer_size / batch_size

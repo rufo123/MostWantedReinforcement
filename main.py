@@ -48,7 +48,7 @@ a
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 2700
+        'previous_model_iter_number': 4286
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -153,7 +153,9 @@ a
 
 
 if __name__ == '__main__':
-    # graph.make_graph.scatter_plot_show('vysledky.txt')
+    # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\
+    # short_race\\third_iteration_training\\edited_score_2.txt'))
+    # exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

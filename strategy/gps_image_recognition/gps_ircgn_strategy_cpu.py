@@ -90,7 +90,7 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
 
         return tmp_car_offset_dist, tmp_contour, tmp_car_directional_offset
 
-    def make_grayscale(self, par_image: ndarray) -> cv2.cuda.GpuMat:
+    def make_grayscale(self, par_image: ndarray) -> np.ndarray:
         """
         Convert an image to grayscale and apply a Gaussian blur.
 

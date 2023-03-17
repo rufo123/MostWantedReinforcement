@@ -1,7 +1,9 @@
 """ Module providing Abstract Base Classes"""
 from abc import ABC, abstractmethod
+from typing import Union
 
 import cv2
+import numpy
 from numpy import ndarray
 
 from gps import GPS
@@ -19,12 +21,20 @@ class AGpsImageRecognitionStrategy(ABC):
         Abstract Method That Calculates Car Offset From Minimap (GPS)
         :param par_gps: The GPS Class
         :param par_image: Screenshot of Game Screen as ndarray
+        :returns: A tuple containing the following:
+            - float: The offset of the car, relative to the center
+                    of the GPS contour.
+            - list: The GPS contour.
+            - int: The directional offset of the car, 
+                        relative to the GPS contour.
         """
 
+    # noinspection PyUnresolvedReferences
     @abstractmethod
-    def make_grayscale(self, par_image: ndarray) -> cv2.cuda.GpuMat:
+    def make_grayscale(self, par_image: ndarray) -> Union[cv2.cuda_GpuMat, numpy.ndarray]:
         """
         Creates GrayScale GpuMat Object from the Image as ndarray
         and then does also GaussianBlur
         :param par_image: Screenshot of Game Screen as ndarray
+        :return: either a cv2.cuda_GpuMat or ndarray object
         """

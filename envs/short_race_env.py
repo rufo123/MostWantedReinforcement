@@ -50,7 +50,7 @@ class Env:
         par_game_inputs: A GameInputs object representing the input to the game.
         """
         super().__init__()
-        self.a_game_speed = None
+        self.a_game_speed: int = 1
         self.env = None
         self.action_counter = 0
         self.controls = Controls()
