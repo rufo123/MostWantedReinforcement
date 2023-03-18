@@ -20,8 +20,8 @@ class WrongWay(MemoryReader):
         Constructs an instance of WrongWay by calling MemoryReader constructor.
         """
         super().__init__(par_return_value_type=ReturnValuesEnum.BOOL,
-                         par_offsets=[0x0, 0x2C, 0x1C, 0x98, 0x14C, 0x4, 0x7FC],
-                         par_module_base_address=0x005B2C30)
+                         par_offsets=[0x318, 0x34, 0x4, 0x8C, 0xC],
+                         par_module_base_address=0x0052FD98)
 
     def return_is_wrong_way(self) -> bool:
         """

@@ -51,7 +51,7 @@ class AGPSStrategy(ABC):
         Private method that does the core processing of the make_gps_contour method.
 
         Args:
-        - par_threshold: a numpy array representing the thresholded GPS mask.
+        - par_threshold: a numpy array representing the threshold GPS mask.
         - par_screenshot_to_draw: a numpy array representing the game screenshot.
         - par_gps_center: a tuple containing the GPS mask center.
 
@@ -113,7 +113,6 @@ class AGPSStrategy(ABC):
         # Draw the ellipse on the GPS mask using numpy
         gps = np.zeros_like(par_greyscale)
         gps = cv2.ellipse(gps, gps_center, gps_size, 0, 180, 360, color=255, thickness=-1)
-
         return gps, gps_center
 
     def __scale_contour(self, par_cnt, par_scale):
@@ -121,22 +120,21 @@ class AGPSStrategy(ABC):
         Protected Method - Scale a contour by a given factor around its center point.
 
         Args:
-            cnt: A numpy array representing a contour.
-            scale: A float representing the scaling factor.
+            par_cnt: A numpy array representing a contour.
+            par_scale: A float representing the scaling factor.
 
         Returns:
             A numpy array representing the scaled contour.
         """
         if par_cnt is not None:
             moments = cv2.moments(par_cnt)
-            if moments['m00'] == 0:
+            m00 = moments['m00']
+            if m00 == 0:
                 return None
-            c_x = int(moments['m10'] / moments['m00'])
-            c_y = int(moments['m01'] / moments['m00'])
+            c_x = int(moments['m10'] / m00)
+            c_y = int(moments['m01'] / m00)
 
             cnt_norm = par_cnt - [c_x, c_y]
-            cnt_scaled = cnt_norm * par_scale
-            cnt_scaled = cnt_scaled + [c_x, c_y]
-            cnt_scaled = cnt_scaled.astype(np.int32)
-            return cnt_scaled
+            cnt_scaled = cnt_norm * par_scale + [c_x, c_y]
+            return cnt_scaled.astype(np.int32)
         return None
