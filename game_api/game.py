@@ -55,7 +55,6 @@ class Game:
     a_height: int
     a_image: ndarray
     a_screenshot: ndarray
-    a_interest_rect_vert: list[tuple[float, float]]
 
     a_game_filename: string = r'F:\Games Folder\Electronic Arts\Need for Speed Most ' \
                               r'Wanted\speed.exe'
@@ -226,18 +225,6 @@ class Game:
             # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
-
-            # Define the region of interest
-            self.a_interest_rect_vert = [
-                (0, self.a_height),
-                (self.a_width / 2, self.a_height / 2),
-                (self.a_width, self.a_height)
-            ]
-
-            # Check for quit key
-            if cv2.waitKey(1) == ord('q'):
-                cv2.destroyAllWindows()
-                break
 
             # Check for record key
             if keyboard.is_pressed('r'):
