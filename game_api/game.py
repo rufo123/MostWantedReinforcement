@@ -24,12 +24,15 @@ from cv2 import cuda
 from numpy import ndarray
 
 from game_api.cheat_engine import CheatEngine
+from game_api.font_settings import FontSettings
 from game_api.image_manipulation import ImageManipulation
 from game_inputs import GameInputs
-from gps import GPS
 from game_memory_reading.lap_progress import LapProgress
 from game_memory_reading.lap_time import LapTime
+from game_memory_reading.revolutions_per_minute import RevolutionsPerMinute
 from game_memory_reading.speedometer import Speedometer
+from game_memory_reading.wrong_way import WrongWay
+from gps import GPS
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
@@ -66,6 +69,10 @@ class Game:
 
     a_lap_time: LapTime
 
+    a_revolutions_per_minute: RevolutionsPerMinute
+
+    a_wrong_way: WrongWay
+
     a_is_recording: bool
 
     a_user23 = ctypes.windll.user32
@@ -73,6 +80,8 @@ class Game:
     a_list_bitmap: []
 
     a_controls: Controls
+
+    a_font_settings: FontSettings
 
     a_speed: int
 
@@ -105,6 +114,12 @@ class Game:
         self.a_list_bitmap = []
         self.a_speed = 3
         self.a_controls = Controls()
+        self.a_font_settings: FontSettings(
+            par_font=cv2.FONT_HERSHEY_SIMPLEX,
+            par_font_scale=1,
+            par_font_thickness=2,
+            par_line_type=2
+        )
 
         cuda.printCudaDeviceInfo(0)
 
@@ -129,6 +144,8 @@ class Game:
         self.a_speedometer.construct()
         self.a_lap_progress.construct()
         self.a_lap_time.construct()
+        self.a_revolutions_per_minute.construct()
+        self.a_wrong_way.construct()
 
     def initialize_game(self, par_game_inputs: GameInputs) -> None:
         """
@@ -156,6 +173,10 @@ class Game:
         self.a_lap_progress = LapProgress()
 
         self.a_lap_time = LapTime()
+
+        self.a_revolutions_per_minute = RevolutionsPerMinute()
+
+        self.a_wrong_way = WrongWay()
 
         self.a_cheat_engine.start_cheat_engine()
         self.a_cheat_engine.set_speed(self.a_speed)
@@ -223,8 +244,11 @@ class Game:
                 self.a_is_recording = True
                 self.a_list_bitmap = []
 
-            tmp_speed_mph = self.a_speedometer.return_speed_mph()
-            tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
+            tmp_speed_mph: int = self.a_speedometer.return_speed_mph()
+            tmp_lap_progress: float = self.a_lap_progress.return_lap_completed_percent()
+            tmp_revolutions_per_minute: float = \
+                self.a_revolutions_per_minute.return_revolutions_per_minute()
+            tmp_is_wrong_way: bool = self.a_wrong_way.return_is_wrong_way()
 
             # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
             tmp_car_offset_distance: float
@@ -243,7 +267,9 @@ class Game:
                 str(tmp_speed_mph),
                 str(round(tmp_car_offset_distance, 2)),
                 str(round(tmp_lap_progress, 2)),
-                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
+                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction)),
+                str(round(tmp_revolutions_per_minute, 2)),
+                str(tmp_is_wrong_way)
             ])
 
             self.show_texts_on_image(par_image=self.a_screenshot,
@@ -252,14 +278,10 @@ class Game:
                                      )
 
             cv2.imshow('Main Vision', self.a_screenshot)
-            image_path = 'h:/diplomka_vysledky/results/short_race/third_iteration_training' \
-                         '/scatter_plot.png'
-            image = None
-            if os.path.exists(os.path.abspath(image_path)):
-                # Load the image
-                image = cv2.imread(os.path.abspath(image_path))
-            if image is not None:
-                cv2.imshow('Graph: ', image)
+
+            self.show_graph(par_image_path=
+                            'h:/diplomka_vysledky/results/short_race/third_iteration_training' \
+                            '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
 
@@ -288,7 +310,8 @@ class Game:
             par_game_inputs.agent_inputs_state.put(
                 (self.get_speed_mph(), self.get_car_distance_offset(),
                  self.a_lap_progress.return_lap_completed_percent(),
-                 self.a_car_direction_offset))
+                 self.a_car_direction_offset, self.get_revolutions_per_minute(),
+                 self.get_is_wrong_way()))
 
     def is_race_initialised(self) -> bool:
         """
@@ -331,6 +354,36 @@ class Game:
         """
         return self.a_speedometer.return_speed_mph()
 
+    def get_revolutions_per_minute(self) -> float:
+        """
+        Get Car Revolutions per Minute (RPM)
+        :return: Float value describing Car Revolutions per Minute (RPM)
+        """
+        return self.a_revolutions_per_minute.return_revolutions_per_minute()
+
+    def get_is_wrong_way(self) -> bool:
+        """
+        Gets Car Wrong Way
+        :return: bool value describing if the car is going in a wrong way
+        """
+        return self.a_wrong_way.return_is_wrong_way()
+
+    def show_graph(self, par_image_path: str) -> None:
+        """
+        Displays an image of a graph on the screen.
+
+        Args:
+            par_image_path: A string representing the path to the image file.
+        Returns:
+            None.
+        """
+        image = None
+        if os.path.exists(os.path.abspath(par_image_path)):
+            # Load the image
+            image = cv2.imread(os.path.abspath(par_image_path))
+        if image is not None:
+            cv2.imshow('Graph: ', image)
+
     def show_texts_on_image(self, par_image: ndarray,
                             par_font_color: tuple[int, int, int],
                             par_array_of_text: np.ndarray
@@ -348,35 +401,55 @@ class Game:
             None
         """
 
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
-        thickness = 2
-        line_type = 2
+        tmp_new_font_scale: float = self.a_font_settings.font_scale
+
+        if par_array_of_text.size > 5:
+            tmp_new_font_scale -= 0.2 * (par_array_of_text.size - 5)
 
         x_bottom_left_text_coordinate: int = 10
-        y_bottom_left_text_coordinates: list[int] = [int(self.a_height / 4), int(self.a_height / 3),
-                                                     int(self.a_height / 2.4),
-                                                     int(self.a_height / 2)]
 
         texts_to_show: list[str] = [
-            "Speed: " + par_array_of_text[0] + " / mph",
+            "Speed: " + par_array_of_text[0] + " MPH",
             "Road Offset: " + par_array_of_text[1] + "",
             "Completed: " + par_array_of_text[2] + "%",
-            "Incline: " + par_array_of_text[3] + ""
+            "Incline: " + par_array_of_text[3] + "",
+            "RPM: " + par_array_of_text[4] + "",
+            "Wrong Way: " + par_array_of_text[5] + ""
         ]
 
-        for index, text_value in enumerate(texts_to_show):
+        text_size, _ = \
+            cv2.getTextSize(
+                "Text",
+                self.a_font_settings.font,
+                tmp_new_font_scale,
+                self.a_font_settings.thickness
+            )
+        text_height = text_size[1] + self.a_font_settings.thickness
+        text_splitter_height = int(text_height / 2)
+        y_bottom_left_text_coordinate: int = int(self.a_height / 3.5)
+
+        for text_value in texts_to_show:
             bottom_left_corner_of_text: tuple[int, int] = (
                 x_bottom_left_text_coordinate,
-                y_bottom_left_text_coordinates[index]
+                y_bottom_left_text_coordinate
             )
+            # Draw the text with an outline in white color
+            cv2.putText(par_image,
+                        text_value,
+                        bottom_left_corner_of_text,
+                        self.a_font_settings.font,
+                        tmp_new_font_scale,
+                        (255, 255, 255),
+                        abs(self.a_font_settings.thickness) + 3,
+                        self.a_font_settings.line_type)
             cv2.putText(par_image, text_value,
                         bottom_left_corner_of_text,
-                        font,
-                        font_scale,
+                        self.a_font_settings.font,
+                        tmp_new_font_scale,
                         par_font_color,
-                        thickness,
-                        line_type)
+                        self.a_font_settings.thickness,
+                        self.a_font_settings.line_type)
+            y_bottom_left_text_coordinate += text_height + text_splitter_height
 
     def window_capture(self) -> Tuple[np.ndarray, int, int]:
         """
