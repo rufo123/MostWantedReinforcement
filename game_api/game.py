@@ -114,7 +114,7 @@ class Game:
         self.a_list_bitmap = []
         self.a_speed = 3
         self.a_controls = Controls()
-        self.a_font_settings: FontSettings(
+        self.a_font_settings = FontSettings(
             par_font=cv2.FONT_HERSHEY_SIMPLEX,
             par_font_scale=1,
             par_font_thickness=2,

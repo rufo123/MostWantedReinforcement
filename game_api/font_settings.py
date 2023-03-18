@@ -4,17 +4,16 @@ This is a module that provides class for managing font settings to be used in Op
 Classes:
     FontSettings: A class for managing font settings.
 """
-import cv2
 
 
 class FontSettings:
     """
        A class for defining font settings to be used in OpenCV.
     """
-    _a_font: int = cv2.FONT_HERSHEY_SIMPLEX
-    _a_font_scale: float = 1
-    _a_thickness: int = 2
-    _a_line_type: int = 2
+    _a_font: int
+    _a_font_scale: float
+    _a_thickness: int
+    _a_line_type: int
 
     def __init__(self,
                  par_font: int,
@@ -30,10 +29,10 @@ class FontSettings:
             par_font_thickness (int): The thickness of the font.
             par_line_type (int): The type of line to be used.
         """
-        _a_font = par_font
-        _a_font_scale = par_font_scale
-        _a_thickness = par_font_thickness
-        _a_line_type = par_line_type
+        self._a_font = par_font
+        self._a_font_scale = par_font_scale
+        self._a_thickness = par_font_thickness
+        self._a_line_type = par_line_type
 
     @property
     def font(self) -> int:
