@@ -221,10 +221,14 @@ class Game:
         tmp_frame_counter: int = 0
 
         while True:
-
             # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
+
+            # Check for quit key -> !! WARNING - Without this all the windows will be BLANK GREY !!!
+            if cv2.waitKey(1) == ord('q'):
+                cv2.destroyAllWindows()
+                break
 
             # Check for record key
             if keyboard.is_pressed('r'):
