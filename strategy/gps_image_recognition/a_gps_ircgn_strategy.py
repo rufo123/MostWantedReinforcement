@@ -1,4 +1,7 @@
-""" Module providing Abstract Base Classes"""
+""" 
+Module providing Abstract Base class for implementing a strategy to recognize the position
+    of a car in a racing game based on GPS data and a screenshot of the game
+"""
 from abc import ABC, abstractmethod
 from typing import Union
 

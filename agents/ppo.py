@@ -72,6 +72,7 @@ def scalar_to_support(par_x, par_support_size):
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-locals
 # pylint: disable=unused-variable
+# pylint: disable=too-many-statements
 def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
            count_of_steps, gamma, gae_lambda) -> None:
     """
@@ -93,6 +94,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     envs = [env_func(env_param) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
+    steps_taken_storage = np.zeros(count_of_steps)
 
     mem_log_probs = torch.zeros((count_of_steps, count_of_envs, 1))
     mem_actions = torch.zeros((count_of_steps, count_of_envs, 1), dtype=torch.long)
@@ -102,6 +104,8 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     for iteration in range(count_of_iterations):
         mem_non_terminals = torch.ones((count_of_steps, count_of_envs, 1))
         scores = []
+        steps_taken_list = []
+
         for step in range(count_of_steps):
             print("STEP: " + str(step))
             connection.send(observations.float())
@@ -115,7 +119,8 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
             mem_values[step] = values
 
             for idx in range(count_of_envs):
-                observation, reward, terminal = envs[idx].step(actions[idx, 0].item())
+                observation, reward, terminal, steps_took_to_complete = envs[idx].step(
+                    actions[idx, 0].item())
                 mem_rewards[step, idx, 0] = reward
                 game_score[idx] += reward
                 print('Single Reward: ' + str(reward))
@@ -126,6 +131,8 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                     mem_non_terminals[step, idx, 0] = 0
                     scores.append(game_score[idx])
                     game_score[idx] = 0
+                    steps_taken_storage[idx] = steps_took_to_complete
+                    steps_taken_list.append(steps_taken_storage[idx])
                     observation = envs[idx].reset()
                 # observations[idx] = observation.clone().detach()
                 with warnings.catch_warnings():
@@ -147,7 +154,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
             values[step] = t_gae + mem_values[step]
             advantages[step] = t_gae.clone()
 
-        connection.send([mem_log_probs, mem_actions, values, advantages, scores])
+        connection.send([mem_log_probs, mem_actions, values, advantages, scores, steps_taken_list])
     connection.recv()
     connection.close()
 
@@ -223,7 +230,7 @@ class Agent:
         """
         print('Training is starting')
 
-        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took'
+        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took,steps_took'
         logs_loss = 'iteration,episode,policy,value,entropy'
 
         score = MovingAverageScore()
@@ -293,8 +300,11 @@ class Agent:
             for idx in range(count_of_processes):
                 connections[idx].send(values[idx])
 
+            iteration_steps_took = 0
+
             for idx in range(count_of_processes):
-                log_probs, actions, values, advantages, scores = connections[idx].recv()
+                log_probs, actions, values, advantages, scores, steps_taken_list = connections[
+                    idx].recv()
                 mem_actions[idx] = actions.to(self.device)
                 mem_log_probs[idx] = log_probs.to(self.device)
                 if self.support_to_value:
@@ -306,11 +316,16 @@ class Agent:
                     mem_values[idx] = values.to(self.device)
                 mem_advantages[idx] = advantages.to(self.device)
                 score.add(scores)
+                iteration_steps_took = np.mean(steps_taken_list)
 
             avg_score, best_score = score.mean()
             print('iteration: ', iteration, '\taverage score: ', avg_score)
             if best_score:
                 print('New best avg score has been achieved', avg_score)
+                torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
+                with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
+                    pickle.dump(score, loaded_score)
+            elif iteration % 100 == 0:
                 torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
                 with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
                     pickle.dump(score, loaded_score)
@@ -379,7 +394,8 @@ class Agent:
                           + str(score.get_count_of_episodes()) + ',' \
                           + str(avg_score) + ',' \
                           + str(score.get_best_avg_score()) + ',' \
-                          + str(round(hours_taken, 2))
+                          + str(round(hours_taken, 2)) + ',' \
+                          + str(round(iteration_steps_took))
 
             logs_loss += '\n' + str(iteration) + ',' \
                          + str(avg_score) + ',' \

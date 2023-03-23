@@ -1,4 +1,9 @@
-""" This module provides a way to define enumerations in Python. """
+""" 
+This module provides an Enumeration class representing the actions that can be taken by the agent.
+    The members of the enumeration are named after the direction of the action,
+    and their values indicate the angle (in multiples of 45 degrees) between the
+    car's current direction and the direction of the action.
+"""
 from enum import Enum
 
 from utils.singleton.controls import Controls

@@ -1,4 +1,7 @@
-""" Module providing image recognition support, known as OpenCV2 """
+"""
+This module provides a class representing a GPS object with the ability to calculate
+    distance and direction offsets using CPU or GPU strategy.
+"""
 import cv2
 import numpy as np
 from numpy import ndarray

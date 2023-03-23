@@ -1,5 +1,5 @@
 """
-Module documentation stub for module_name.py
+This module provides a scatter plot functions to show and save the scatter plot (Graph)
 """
 import os
 

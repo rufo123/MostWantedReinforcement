@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="PylintConfigService">
-    <option name="pylintArguments" value="--recursive=true --enable=typecheck" />
+    <option name="pylintArguments" value="--enable=typecheck --recursive=true" />
   </component>
 </project>

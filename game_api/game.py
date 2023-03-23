@@ -1,5 +1,6 @@
-# Disable the pylint error for the next line
-# pylint: disable=missing-module-docstring
+"""
+This module provides a Class Which Acts as an API with the game Need for Speed: Most Wanted (2005)
+"""
 import ctypes
 import os
 import pathlib
@@ -271,7 +272,7 @@ class Game:
             cv2.imshow('Main Vision', self.a_screenshot)
 
             self.show_graph(par_image_path=
-                            'h:/diplomka_vysledky/results/short_race/third_iteration_training' \
+                            'h:/diplomka_vysledky/results/short_race/fourth_iteration_training' \
                             '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant

@@ -29,7 +29,11 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
         None: This function doesn't return anything.
     """
     tmp_game: Game = Game()
-    tmp_game.main_loop(par_game_inputs)
+    try:
+        tmp_game.main_loop(par_game_inputs)
+    except Exception as exception:
+        print(f"An error occurred in Game Api: {exception}")
+        raise
 
 
 # pylint: disable=too-many-locals
@@ -48,7 +52,7 @@ a
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 4286
+        'previous_model_iter_number': 1580
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -56,7 +60,7 @@ a
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'third_iteration_training'
+    name = 'fourth_iteration_training'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
@@ -139,8 +143,9 @@ a
                     count_of_steps=count_of_steps,
                     count_of_epochs=count_of_epochs,
                     batch_size=batch_size, input_dim=dim1)
-    except Exception as exception:  # pylint: disable=broad-except
-        print("An exception occurred during training:", str(exception))
+    except Exception as exception:
+        print(f"An exception occurred during training:: {exception}")
+        raise
     # except Exception as e:
     #     i = i - 1
     #     continue
@@ -153,8 +158,9 @@ a
 
 
 if __name__ == '__main__':
-    # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\
-    # short_race\\third_iteration_training\\edited_score_2.txt'))
+    # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\\'
+    #                                                   'short_race\\fourth_iteration_training'
+    #                                                   '\\tempscore\\logs_score.txt'))
     # exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
