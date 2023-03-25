@@ -34,6 +34,11 @@ from game_memory_reading.revolutions_per_minute import RevolutionsPerMinute
 from game_memory_reading.speedometer import Speedometer
 from game_memory_reading.wrong_way import WrongWay
 from gps import GPS
+from state.a_game_state import AGameState
+from state.game_state_not_connected import GameStateNotConnected
+from state.game_state_restarting import GameStateRestarting
+from state.game_state_starting import GameStateStarting
+from state.game_state_training import GameStateTraining
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
@@ -103,6 +108,8 @@ class Game:
 
     a_image_manipulation: ImageManipulation
 
+    a_game_state: AGameState
+
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
         self.a_image_manipulation.load_comparable_images()
@@ -112,7 +119,7 @@ class Game:
         self.a_cycles_passed = 0
         self.a_cheat_engine = CheatEngine()
         self.a_list_bitmap = []
-        self.a_speed = 3
+        self.a_speed = 5
         self.a_controls = Controls()
         self.a_font_settings = FontSettings(
             par_font=cv2.FONT_HERSHEY_SIMPLEX,
@@ -120,6 +127,7 @@ class Game:
             par_font_thickness=2,
             par_line_type=2
         )
+        self.a_game_state = GameStateNotConnected()
 
         cuda.printCudaDeviceInfo(0)
 
@@ -159,6 +167,7 @@ class Game:
         Returns:
             None
         """
+        self.a_game_state = GameStateStarting()
         self.start_game()
         # self.start_cheat_engine()
 
@@ -189,7 +198,7 @@ class Game:
 
         self.init_game_memory_objects()
 
-        self.a_cheat_engine.reconfigure_speed(4)
+        self.a_cheat_engine.reconfigure_speed(5)
 
         self.init_game_race(0.7 / float(4), 0.1 / float(4))
 
@@ -198,6 +207,8 @@ class Game:
         time.sleep(3)
 
         self.a_race_initialised = True
+
+        self.a_controls.release_all_keys()
 
         self.a_cycles_passed = 0
 
@@ -209,7 +220,7 @@ class Game:
 
         Args:
             par_game_inputs (GameInputs): An instance of the GameInputs class containing the
-                inputs for the game.
+                inputs for the game.a
 
         Returns:
             None: This method doesn't return anything.
@@ -264,15 +275,10 @@ class Game:
                 str(tmp_is_wrong_way)
             ])
 
-            self.show_texts_on_image(par_image=self.a_screenshot,
-                                     par_font_color=(159, 43, 104),
-                                     par_array_of_text=strings_to_show
-                                     )
-
-            cv2.imshow('Main Vision', self.a_screenshot)
+            backup_screenshot: ndarray = self.a_screenshot
 
             self.show_graph(par_image_path=
-                            'h:/diplomka_vysledky/results/short_race/fourth_iteration_training' \
+                            'h:/diplomka_vysledky/results/short_race/sixth_iteration_training' \
                             '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
@@ -287,8 +293,15 @@ class Game:
             while not par_game_inputs.game_restart_inputs.empty():
                 tmp_needs_restart: bool = par_game_inputs.game_restart_inputs.get()
                 if tmp_needs_restart:
+                    self.a_game_state = GameStateRestarting()
+
+                    self.update_state_on_screen(self.a_screenshot)
+
                     par_game_inputs.game_restart_inputs.put(tmp_needs_restart)
                     self.reset_game_race(0.7 / float(self.a_speed), 0.01 / float(self.a_speed))
+
+                    self.a_game_state = GameStateTraining()
+
                     par_game_inputs.game_restart_inputs.get()
 
             # .empty() returns False or True, it is not function to empty the Queue
@@ -299,11 +312,22 @@ class Game:
                     par_game_inputs.agent_inputs_state.get_nowait()
                 except Empty:
                     pass  # This case is possible qsize() is unreliable, it is expected behaviour
+
             par_game_inputs.agent_inputs_state.put(
                 (self.get_speed_mph(), self.get_car_distance_offset(),
                  self.a_lap_progress.return_lap_completed_percent(),
                  self.a_car_direction_offset, self.get_revolutions_per_minute(),
                  self.get_is_wrong_way()))
+
+            self.show_texts_on_image(par_image=backup_screenshot,
+                                     par_font_color=(159, 43, 104),
+                                     par_array_of_text=strings_to_show
+                                     )
+
+            self.show_state_on_image(par_image=backup_screenshot,
+                                     par_game_state=self.a_game_state)
+
+            cv2.imshow('Main Vision', backup_screenshot)
 
     def is_race_initialised(self) -> bool:
         """
@@ -375,6 +399,75 @@ class Game:
             image = cv2.imread(os.path.abspath(par_image_path))
         if image is not None:
             cv2.imshow('Graph: ', image)
+
+    def update_state_on_screen(self, par_image: ndarray) -> None:
+        """
+        Updates the game state on the screen.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+        
+        Returns:
+            None
+        """
+        self.show_state_on_image(par_image=par_image,
+                                 par_game_state=self.a_game_state)
+
+        cv2.imshow('Main Vision', self.a_screenshot)
+
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+
+    def show_state_on_image(self, par_image: ndarray,
+                            par_game_state: AGameState) -> None:
+        """
+        Displays the game state on an image.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+            par_game_state (AGameState): The current game state object.
+
+        Returns:
+            None
+        """
+        tmp_new_font_scale: float = self.a_font_settings.font_scale
+
+        test_to_show: str = par_game_state.return_state_text()
+
+        text_size, _ = \
+            cv2.getTextSize(
+                test_to_show,
+                self.a_font_settings.font,
+                tmp_new_font_scale,
+                self.a_font_settings.thickness
+            )
+
+        text_height = text_size[1] + self.a_font_settings.thickness
+        text_splitter_height = int(text_height / 2)
+        x_bottom_left_text_coordinate: int = int(self.a_width / 2) - int(text_size[0] / 2)
+        y_bottom_left_text_coordinate: int = self.a_height - text_height
+
+        bottom_left_corner_of_text: tuple[int, int] = (
+            x_bottom_left_text_coordinate,
+            y_bottom_left_text_coordinate
+        )
+        # Draw the text with an outline in white color
+        cv2.putText(par_image,
+                    test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    (255, 255, 255),
+                    abs(self.a_font_settings.thickness) + 3,
+                    self.a_font_settings.line_type)
+        cv2.putText(par_image, test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    par_game_state.return_color_representation(),
+                    self.a_font_settings.thickness,
+                    self.a_font_settings.line_type)
+        y_bottom_left_text_coordinate += text_height + text_splitter_height
 
     def show_texts_on_image(self, par_image: ndarray,
                             par_font_color: tuple[int, int, int],
@@ -665,6 +758,7 @@ class Game:
         Returns:
             None
         """
+        self.a_controls.reset_directional_controls()
         time.sleep(par_sleep_time_delay)
         self.a_controls.release_all_keys()
 

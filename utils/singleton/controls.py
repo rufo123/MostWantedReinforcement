@@ -42,6 +42,15 @@ class Controls(metaclass=ThreadSafeSingleton):
     def __init__(self, ):
         self.a_lock = Lock()
 
+    def reset_directional_controls(self) -> None:
+        """
+        Resets all directional key presses, by pressing and releasing it for 0 seconds
+        """
+        keys_to_reset: list[int] = [self.W_KEY, self.D_KEY, self.S_KEY, self.A_KEY]
+
+        for key_to_reset in keys_to_reset:
+            self.press_and_release_key(key_to_reset, 0, True)
+
     def press_key(self, par_hex_key_code: int) -> None:
         """
         Presses key via Direct Input
