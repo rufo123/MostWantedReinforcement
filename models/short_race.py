@@ -35,28 +35,27 @@ class PolicyValueModel(nn.Module):
         # pylint: disable=unused-argument, disable=super-with-arguments
         super(PolicyValueModel, self).__init__()
 
-        # input 2x84x84
         self.features_model = nn.Sequential(
-            nn.Linear(35, 96),  #
+            nn.Linear(35, 192),
             nn.ReLU(),
-            nn.Linear(96, 128),  #
+            nn.Linear(192, 256),
             nn.ReLU(),
-            nn.Linear(128, 128),  #
+            nn.Linear(256, 256),
             nn.ReLU(),
         )
         self.features_model.apply(init_orthogonal_features)
 
         self.policy_model = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(128, count_of_actions)
+            nn.Linear(256, count_of_actions)
         )
         self.policy_model.apply(init_orthogonal_head)
 
         self.value_model = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(256, 256),
             nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(256, 1)
         )
         self.value_model.apply(init_orthogonal_head)
 
