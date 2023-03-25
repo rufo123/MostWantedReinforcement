@@ -52,7 +52,7 @@ a
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 1580
+        'previous_model_iter_number': 1920
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -60,7 +60,7 @@ a
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'fourth_iteration_training'
+    name = 'fifth_iteration_training'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
@@ -88,7 +88,7 @@ a
         os.mkdir(os.path.abspath(path))
         print('new directory has been created')
 
-    dim1 = 25
+    dim1 = 35
     count_of_actions = 8
     count_of_features = 8448
 
@@ -158,10 +158,10 @@ a
 
 
 if __name__ == '__main__':
-    # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\\'
-    #                                                   'short_race\\fourth_iteration_training'
-    #                                                   '\\tempscore\\logs_score.txt'))
-    # exit()
+    #graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\\'
+    #                                                  'short_race\\fourth_iteration_training'
+    #                                                  '\\vysledne_skore.txt'))
+    #exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

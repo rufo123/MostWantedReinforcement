@@ -37,7 +37,7 @@ class PolicyValueModel(nn.Module):
 
         # input 2x84x84
         self.features_model = nn.Sequential(
-            nn.Linear(25, 96),  #
+            nn.Linear(35, 96),  #
             nn.ReLU(),
             nn.Linear(96, 128),  #
             nn.ReLU(),

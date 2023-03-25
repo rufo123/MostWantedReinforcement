@@ -60,7 +60,7 @@ class Env:
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
 
-        self.a_state_matrix = np.zeros((5, 5), dtype=float) - 1
+        self.a_state_matrix = np.zeros((5, 7), dtype=float) - 1
 
     def make_state(self):
         """
@@ -86,9 +86,12 @@ class Env:
         tmp_car_distance_offset: float = tmp_normalized_tuple_with_values[1]
         tmp_lap_progress: float = tmp_normalized_tuple_with_values[2]
         tmp_car_direction_offset: int = tmp_normalized_tuple_with_values[3]
+        tmp_car_rpm: float = tmp_normalized_tuple_with_values[4]
+        tmp_car_wrong_way_indicator: float = tmp_normalized_tuple_with_values[5]
 
-        new_state_input: tuple[int, float, float, float, int] = (
-            -1, tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_car_direction_offset)
+        new_state_input: tuple[int, float, float, float, int, float, float] = (
+            -1, tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_car_direction_offset,
+            tmp_car_rpm, tmp_car_wrong_way_indicator)
 
         state = self.calculate_state(new_state_input)
 
@@ -96,8 +99,11 @@ class Env:
 
         return state, tmp_reward, terminal
 
-    def normalize_state_values(self, par_state_inputs: tuple[float, float, float, int]) -> tuple[
-        float, float, float, int]:
+    #pylint: disable=too-many-locals
+    def normalize_state_values(self,
+                               par_state_inputs: tuple[float, float, float, int, float, float]) -> \
+            tuple[
+                float, float, float, int, float, float]:
         """
         Normalizes the input state values and returns a tuple of normalized values.
 
@@ -131,11 +137,21 @@ class Env:
         tmp_not_normalized_direction_offset: int = par_state_inputs[3]
         tmp_normalized_direction_offset: int = tmp_not_normalized_direction_offset
 
+        tmp_not_normalized_rpm: float = par_state_inputs[4]
+        tmp_max_car_rpm: float = 7000
+        tmp_min_car_rpm: float = 800
+        tmp_normalized_rpm = (tmp_not_normalized_rpm - tmp_min_car_rpm) / tmp_max_car_rpm
+
+        tmp_not_normalized_way_point_indicator: float = par_state_inputs[5]
+        tmp_normalized_way_point_indicator: float = tmp_not_normalized_way_point_indicator
+
         return (
             round(tmp_normalized_speed, ndigits=6),
             round(tmp_normalized_distance_offset, ndigits=6),
             round(tmp_normalized_lap_progress, ndigits=5),
-            tmp_normalized_direction_offset
+            tmp_normalized_direction_offset,
+            tmp_normalized_rpm,
+            tmp_normalized_way_point_indicator
         )
 
     def reset(self):
@@ -187,6 +203,7 @@ class Env:
         """
         self.a_lap_percent_curr = par_new_lap_percent
 
+    # pylint: disable=too-many-locals
     def step(self, action):
         """
         Takes an action in the environment and returns the next state, reward, and done flag.
@@ -214,12 +231,14 @@ class Env:
         tmp_car_distance_offset: float = tmp_tuple_with_values[1]
         tmp_lap_progress: float = tmp_tuple_with_values[2]
         tmp_car_direction_offset: float = tmp_tuple_with_values[3]
+        tmp_car_rpm: float = tmp_tuple_with_values[4]
+        tmp_wrong_way_indicator: bool = tmp_tuple_with_values[5]
 
         tmp_lap_progress_diff: float = self.get_lap_progress_dif(tmp_lap_progress)
 
-        edited_state_tuple: tuple[float, float, float, float, float] = \
+        edited_state_tuple: tuple[float, float, float, float, float, float, float] = \
             (tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_lap_progress_diff,
-             tmp_car_direction_offset)
+             tmp_car_direction_offset, tmp_car_rpm, tmp_wrong_way_indicator)
 
         new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_state_tuple,
                                                                       self.game_steps_per_episode,
@@ -229,13 +248,15 @@ class Env:
 
         self.update_lap_curr(tmp_lap_progress)
 
-        tmp_normalized_inputs: tuple[float, float, float, int] = self.normalize_state_values(
-            (tmp_speed, tmp_car_distance_offset, tmp_lap_progress, int(tmp_car_direction_offset))
-        )
+        tmp_normalized_inputs: tuple[float, float, float, int, float, float] \
+            = self.normalize_state_values((tmp_speed, tmp_car_distance_offset, tmp_lap_progress,
+                                           int(tmp_car_direction_offset), tmp_car_rpm,
+                                           float(tmp_wrong_way_indicator))
+                                          )
 
-        new_state_input: tuple[int, float, float, float, int] = (
+        new_state_input: tuple[int, float, float, float, int, float, float] = (
             action, tmp_normalized_inputs[0], tmp_normalized_inputs[1], tmp_normalized_inputs[2],
-            tmp_normalized_inputs[3])
+            tmp_normalized_inputs[3], tmp_normalized_inputs[4], tmp_normalized_inputs[5])
         new_state = self.calculate_state(new_state_input)
 
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
@@ -244,7 +265,7 @@ class Env:
         return new_state, reward, terminal, self.a_step_counter
 
     def calculate_state(self, par_current_inputs:
-    tuple[int, float, float, float, int]) -> torch.tensor:
+    tuple[int, float, float, float, int, float, float]) -> torch.tensor:
         """
         Shifts the rows of the state matrix down by one row and inserts the new input parameters
         in the first row. Prints the updated matrix.
@@ -257,12 +278,14 @@ class Env:
         Returns:
             Torch Tensor representing state as a tensor
         """
-        current_inputs_rounded: tuple[int, float, float, float, int] = (
+        current_inputs_rounded: tuple[int, float, float, float, int, float, float] = (
             par_current_inputs[0],
             round(par_current_inputs[1], ndigits=6),
             round(par_current_inputs[2], ndigits=6),
             round(par_current_inputs[3], ndigits=5),
-            par_current_inputs[4]
+            par_current_inputs[4],
+            par_current_inputs[5],
+            par_current_inputs[6]
         )
 
         # shift the rows down
@@ -270,10 +293,10 @@ class Env:
         # insert the new parameters in the first row
         self.a_state_matrix[0, :] = current_inputs_rounded
         # print the updated matrix
-        # print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
-        # print(self.a_state_matrix)
+        #print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
+        #print(self.a_state_matrix)
 
-        return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
+        return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 35)
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
         """

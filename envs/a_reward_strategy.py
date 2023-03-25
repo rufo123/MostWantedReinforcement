@@ -16,7 +16,8 @@ class ARewardStrategy(ABC):
         pass
 
     @abstractmethod
-    def evaluate_reward(self, par_env_inputs: tuple[float, float, float, float, float],
+    def evaluate_reward(self,
+                        par_env_inputs: tuple[float, float, float, float, float, float, float],
                         par_game_steps_per_episode: int,
                         par_env_steps_counter: int,
                         par_terminal: bool) -> tuple[float, bool]:
