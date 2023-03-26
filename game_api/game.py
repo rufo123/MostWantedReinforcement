@@ -198,7 +198,7 @@ class Game:
 
         self.init_game_memory_objects()
 
-        self.a_cheat_engine.reconfigure_speed(5)
+        self.a_cheat_engine.reconfigure_speed(10)
 
         self.init_game_race(0.7 / float(4), 0.1 / float(4))
 
@@ -211,6 +211,8 @@ class Game:
         self.a_controls.release_all_keys()
 
         self.a_cycles_passed = 0
+
+        print("Game Init, Inserting Initialised Values For Agent")
 
         par_game_inputs.game_initialization_inputs.put((self.a_race_initialised, self.a_speed))
 
@@ -233,6 +235,7 @@ class Game:
         tmp_frame_counter: int = 0
 
         while True:
+
             # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
@@ -248,6 +251,7 @@ class Game:
                 self.a_list_bitmap = []
 
             tmp_speed_mph: int = self.a_speedometer.return_speed_mph()
+
             tmp_lap_progress: float = self.a_lap_progress.return_lap_completed_percent()
             tmp_revolutions_per_minute: float = \
                 self.a_revolutions_per_minute.return_revolutions_per_minute()
@@ -276,7 +280,6 @@ class Game:
             ])
 
             backup_screenshot: ndarray = self.a_screenshot
-
             self.show_graph(par_image_path=
                             'h:/diplomka_vysledky/results/short_race/sixth_iteration_training' \
                             '/scatter_plot.png')

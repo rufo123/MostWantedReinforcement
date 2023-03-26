@@ -160,7 +160,7 @@ a
 if __name__ == '__main__':
     # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\\'
     #                                                   'short_race\\fourth_iteration_training'
-    #                                                   '\\tempscore\\logs_score.txt'))
+    #                                                   '\\vysledne_skore.txt'))
     # exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()

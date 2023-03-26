@@ -44,23 +44,26 @@ class ActionTranslatorEnum(Enum):
         Returns:
           - The integer value of the action taken.
           """
+        executed_correctly: bool = False
         action = self.value
         par_controls.release_all_keys()
         if action == 0:
-            par_controls.forward(par_sleep_time)
+            executed_correctly = par_controls.forward(par_sleep_time)
         elif action == 1:
-            par_controls.forward_right(par_sleep_time)
+            executed_correctly = par_controls.forward_right(par_sleep_time)
         elif action == 2:
-            par_controls.right(par_sleep_time)
+            executed_correctly = par_controls.right(par_sleep_time)
         elif action == 3:
-            par_controls.backward_right(par_sleep_time)
+            executed_correctly = par_controls.backward_right(par_sleep_time)
         elif action == 4:
-            par_controls.backward(par_sleep_time)
+            executed_correctly = par_controls.backward(par_sleep_time)
         elif action == 5:
-            par_controls.backward_left(par_sleep_time)
+            executed_correctly = par_controls.backward_left(par_sleep_time)
         elif action == 6:
-            par_controls.left(par_sleep_time)
+            executed_correctly = par_controls.left(par_sleep_time)
         else:
-            par_controls.forward_left()
+            executed_correctly = par_controls.forward_left(par_sleep_time)
         print("Action: " + str(self))
+        if not executed_correctly:
+            raise ValueError("Control didn't execute correctly")
         return action

@@ -58,7 +58,6 @@ class MemoryReader:
         - The value read from the memory address. The type of the value is determined
              by the return_value_type field.
         """
-        self.lock.acquire()
 
         if self.return_value_type == ReturnValuesEnum.FLOAT:
             self.returned_value_from_pointer_address = self.mem.read_float(
@@ -70,7 +69,6 @@ class MemoryReader:
             self.returned_value_from_pointer_address = self.mem.read_bool(
                 self.get_pointer_address(self.module + self.module_base_address, self.offsets))
 
-        self.lock.release()
         return self.returned_value_from_pointer_address
 
     def get_pointer_address(self, base: int, offsets: list[int]) -> int:
