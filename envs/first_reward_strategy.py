@@ -10,6 +10,7 @@ Classes:
 """
 from car_states.car_state_in_environment import CarStateInEnvironment
 from envs.a_reward_strategy import ARewardStrategy
+from utils.print_utils.printer import Printer
 
 
 # pylint: disable=too-few-public-methods
@@ -75,12 +76,13 @@ class FirstRewardStrategy(ARewardStrategy):
         if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
-                print("Exceeded Step Limit")
+                Printer.print_info("Exceeded Step Limit", "REWARD_STRATEGY",)
                 reward += -1
             if par_env_inputs.lap_progress >= 10:
                 reward += 1
-                print("Lap Complete")
-            print("Terminal")
+                Printer.print_success("Lap Complete", "REWARD_STRATEGY")
+                print()
+            Printer.print_info("TERMINAL STATE ACHIEVED", "REWARD_STRATEGY")
         return reward, terminal
 
     def __distance_offset_reward(self, par_car_distance_offset: float,
@@ -131,7 +133,7 @@ class FirstRewardStrategy(ARewardStrategy):
     def __lap_progress_reward(self, par_lap_progress_diff: float,
                               par_normalization_value: int) -> float:
         """
-        Calculates the lap progress reward based on the difference in lap progress
+        Calculates the lap progress reward based on the difference in lap progresswawd
         between the current and previous time step.
 
         :param par_lap_progress_diff: A float representing the difference in lap
@@ -148,6 +150,5 @@ class FirstRewardStrategy(ARewardStrategy):
             to the magnitude of the lap progress difference, divided by the
             normalization value.
         """
-
-        print("Progress: " + str(par_lap_progress_diff))
+        Printer.print_basic("Progress: " + str(par_lap_progress_diff), "REWARD_STRATEGY")
         return par_lap_progress_diff / par_normalization_value

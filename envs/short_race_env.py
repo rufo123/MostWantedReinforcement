@@ -14,6 +14,7 @@ from car_states.car_state_in_environment import CarStateInEnvironment
 from envs.a_reward_strategy import ARewardStrategy
 from envs.reward_strategy_enum import RewardStrategyEnum
 from game_inputs import GameInputs
+from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
 
 FLAGS = flags.FLAGS
@@ -75,10 +76,9 @@ class Env:
         tmp_reward: float = 0
         if self.a_game_inputs.agent_inputs_state is None:
             pass
-        print("Debug Call")
 
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
-            print("Waiting for Game API to send data (Make_State)")
+            Printer.print_info("Waiting for Game API to send data (Make_State)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
@@ -145,7 +145,6 @@ class Env:
         Returns:
         A numpy array representing the initial state of the environment.
         """
-        print("Debug Call")
         self.controls.release_all_keys()
         state, _, _ = self.make_state()
 
@@ -157,9 +156,9 @@ class Env:
 
         self.controls.a_is_executing_critical_action = True
         self.a_game_inputs.game_restart_inputs.put(True)
-        print("Restart Initiated")
+        Printer.print_info("Restart Initiated", "ENV")
         while not self.a_game_inputs.game_restart_inputs.empty():
-            print("Waiting For Game To Restart")
+            Printer.print_info("Waiting For Game To Restart", "ENV")
             time.sleep(1)
         self.a_step_counter = 0
         self.controls.a_is_executing_critical_action = False
@@ -199,7 +198,8 @@ class Env:
         A tuple containing the next state, reward, done flag, and steps taken.
         """
         self.a_step_counter += 1
-        print("Step Internal Counter: " + str(self.a_step_counter))
+        Printer.print_basic("--------------------")
+        Printer.print_info("Step Internal Counter: " + str(self.a_step_counter), "ENV")
         terminal = False
         reward: float = 0
         self.take_action(action, 1 / self.a_game_speed)
@@ -207,7 +207,7 @@ class Env:
         # daj progress - +1% - prida reward
         # daj progress - -1% - da pokutu
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
-            print("Waiting for Game API to send data (Step)")
+            Printer.print_info("Waiting for Game API to send data (Step)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
@@ -276,9 +276,9 @@ class Env:
         self.a_state_matrix[1:, :] = self.a_state_matrix[:-1, :]
         # insert the new parameters in the first row
         self.a_state_matrix[0, :] = current_inputs_rounded
-        # print the updated matrix
-        # print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
-        # print(self.a_state_matrix)
+        # print_utils the updated matrix
+        # print_utils("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
+        # print_utils(self.a_state_matrix)
 
         return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
 

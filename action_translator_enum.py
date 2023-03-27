@@ -6,6 +6,7 @@ This module provides an Enumeration class representing the actions that can be t
 """
 from enum import Enum
 
+from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
 
 
@@ -63,7 +64,7 @@ class ActionTranslatorEnum(Enum):
             executed_correctly = par_controls.left(par_sleep_time)
         else:
             executed_correctly = par_controls.forward_left(par_sleep_time)
-        print("Action: " + str(self))
+        Printer.print_success("Action: " + str(self), "ACT_TRANS")
         if not executed_correctly:
             raise ValueError("Control didn't execute correctly")
         return action

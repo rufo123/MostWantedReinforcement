@@ -14,6 +14,7 @@ from envs.short_race_env import create_env
 from game_api.game import Game
 from game_inputs import GameInputs
 from models.short_race import PolicyValueModel
+from utils.print_utils.printer import Printer
 from utils.stats import write_to_file
 
 
@@ -32,7 +33,7 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
     try:
         tmp_game.main_loop(par_game_inputs)
     except Exception as exception:
-        print(f"An error occurred in Game Api: {exception}")
+        Printer.print_error("An error occurred in Game Api", "MAIN", exception)
         raise
 
 
@@ -45,18 +46,18 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     Args:
         par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
             the game.
-a
-    Returns:a
+
+    Returns:
         None: This function doesn't return anything.
     """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 40
+        'previous_model_iter_number': 510
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(torch.version.cuda)
-    print('device: ', device)
+    Printer.print_basic(torch.version.cuda, "MAIN")
+    Printer.print_basic("device: " + str(device))
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -83,10 +84,10 @@ a
     path_logs_score = path + 'logs_score_results.txt'
 
     if os.path.isdir(os.path.abspath(path)):
-        print('directory has already existed')
+        Printer.print_basic("directory has already existed", "MAIN")
     else:
         os.mkdir(os.path.abspath(path))
-        print('new directory has been created')
+        Printer.print_success("new directory has been created", "MAIN")
 
     dim1 = 25
     count_of_actions = 8
@@ -120,7 +121,7 @@ a
     par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
 
     while not tmp_is_game_started:
-        print("Waiting for Race to Initialise")
+        Printer.print_info("Waiting for Race to Initialise", "MAIN")
 
         tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
 
@@ -133,8 +134,6 @@ a
     iteration_number = iteration_number + 1
     time_started = time.perf_counter()
 
-    print()
-
     try:
         agent.train(env_param, create_env, count_of_actions,
                     count_of_iterations=count_of_iterations,
@@ -144,7 +143,7 @@ a
                     count_of_epochs=count_of_epochs,
                     batch_size=batch_size, input_dim=dim1)
     except Exception as exception:
-        print(f"An exception occurred during training:: {exception}")
+        Printer.print_error("An exception occurred during training", "MAIN", exception)
         raise
     # except Exception as e:
     #     i = i - 1

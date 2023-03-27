@@ -146,7 +146,7 @@ class Controls(metaclass=ThreadSafeSingleton):
         Releases All Specified Keys if They are Still Pressed
         Keys: [UP_KEY, RIGHT_KEY, DOWN_KEY, LEFT_KEY, HAND_BRAKE, ENTER, ESCAPE]
         """
-        keys_to_release = [self.UP_KEY, self.RIGHT_KEY, self.DOWN_KEY, self.LEFT_KEY,
+        keys_to_release = [self.W_KEY, self.D_KEY, self.S_KEY, self.A_KEY,
                            self.HAND_BRAKE, self.ENTER,
                            self.ESCAPE]
         for key in keys_to_release:
