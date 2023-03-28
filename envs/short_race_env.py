@@ -89,54 +89,13 @@ class Env:
             par_incline_center=tmp_tuple_with_values[3]
         )
 
-        tmp_normalized_car_state_from_game = self.normalize_state_values(tmp_car_state_from_game)
-
         state = self.calculate_state(
             par_action_taken=-1,
-            par_current_car_state=tmp_normalized_car_state_from_game)
+            par_current_car_state=tmp_car_state_from_game)
 
         state = state.numpy()
 
         return state, tmp_reward, terminal
-
-    def normalize_state_values(self, par_car_state_not_normalized: CarState) -> CarState:
-        """
-        Normalizes the input state values and returns a tuple of normalized values.
-
-        Args:
-            par_car_state_not_normalized (CarState): A CarState object of unnormalized state
-                values, including the car speed, distance offset, lap progress, and direction
-                offset.
-
-        Returns:
-            CarState: A CarState object of normalized state values, including the
-                normalized car speed, normalized distance offset, normalized lap progress,
-                and normalized direction offset.
-        """
-        tmp_car_top_speed: float = 111
-        tmp_normalized_speed = par_car_state_not_normalized.speed_mph / tmp_car_top_speed
-
-        if par_car_state_not_normalized.distance_offset_center >= 0:
-            tmp_normalized_distance_offset: float = 1
-        elif par_car_state_not_normalized.distance_offset_center >= -1:
-            tmp_normalized_distance_offset: float = \
-                1 + par_car_state_not_normalized.distance_offset_center
-        elif par_car_state_not_normalized.distance_offset_center >= -50:
-            tmp_normalized_distance_offset: float = \
-                (1 + par_car_state_not_normalized.distance_offset_center) / 49
-        else:
-            tmp_normalized_distance_offset: float = -1
-
-        tmp_normalized_lap_progress: float = par_car_state_not_normalized.lap_progress / 100
-
-        tmp_normalized_direction_offset: float = par_car_state_not_normalized.incline_center
-
-        return CarState(
-            par_speed_mph=round(tmp_normalized_speed, ndigits=6),
-            par_distance_offset_center=round(tmp_normalized_distance_offset, ndigits=6),
-            par_lap_progress=round(tmp_normalized_lap_progress, ndigits=5),
-            par_incline_center=tmp_normalized_direction_offset
-        )
 
     def reset(self):
         """
@@ -233,15 +192,9 @@ class Env:
 
         self.update_lap_curr(tmp_lap_progress)
 
-        tmp_normalized_car_state: CarState = \
-            self.normalize_state_values(CarState(par_speed_mph=tmp_speed,
-                                                 par_distance_offset_center=tmp_car_distance_offset,
-                                                 par_lap_progress=tmp_lap_progress,
-                                                 par_incline_center=tmp_car_direction_offset))
-
         new_state = self.calculate_state(
             par_action_taken=action,
-            par_current_car_state=tmp_normalized_car_state
+            par_current_car_state=edited_car_state
         )
 
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
@@ -266,9 +219,9 @@ class Env:
         """
         current_inputs_rounded: tuple[int, float, float, float, float] = (
             par_action_taken,
-            round(par_current_car_state.speed_mph, ndigits=6),
+            par_current_car_state.speed_mph,
             round(par_current_car_state.distance_offset_center, ndigits=6),
-            round(par_current_car_state.lap_progress, ndigits=5),
+            par_current_car_state.lap_progress,
             par_current_car_state.incline_center
         )
 

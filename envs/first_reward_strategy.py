@@ -133,7 +133,7 @@ class FirstRewardStrategy(ARewardStrategy):
     def __lap_progress_reward(self, par_lap_progress_diff: float,
                               par_normalization_value: int) -> float:
         """
-        Calculates the lap progress reward based on the difference in lap progresswawd
+        Calculates the lap progress reward based on the difference in lap progress
         between the current and previous time step.
 
         :param par_lap_progress_diff: A float representing the difference in lap
