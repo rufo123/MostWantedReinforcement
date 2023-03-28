@@ -272,7 +272,8 @@ class Game:
             cv2.imshow('Main Vision', self.a_screenshot)
 
             self.show_graph(par_image_path=
-                            'h:/diplomka_vysledky/results/short_race/fourth_iteration_training' \
+                            'h:/diplomka_vysledky/results/'
+                            'short_race/fourth_iteration_training_normalization_fixed_bugs'
                             '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant

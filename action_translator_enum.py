@@ -61,6 +61,6 @@ class ActionTranslatorEnum(Enum):
         elif action == 6:
             par_controls.left(par_sleep_time)
         else:
-            par_controls.forward_left()
+            par_controls.forward_left(par_sleep_time)
         print("Action: " + str(self))
         return action

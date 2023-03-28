@@ -52,7 +52,7 @@ a
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 1580
+        'previous_model_iter_number': 710
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -60,7 +60,7 @@ a
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'fourth_iteration_training'
+    name = 'fourth_iteration_training_normalization_fixed_bugs'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
