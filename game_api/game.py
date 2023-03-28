@@ -119,7 +119,7 @@ class Game:
         self.a_cycles_passed = 0
         self.a_cheat_engine = CheatEngine()
         self.a_list_bitmap = []
-        self.a_speed = 5
+        self.a_speed = 3
         self.a_controls = Controls()
         self.a_font_settings = FontSettings(
             par_font=cv2.FONT_HERSHEY_SIMPLEX,
@@ -253,9 +253,6 @@ class Game:
             tmp_speed_mph: int = self.a_speedometer.return_speed_mph()
 
             tmp_lap_progress: float = self.a_lap_progress.return_lap_completed_percent()
-            tmp_revolutions_per_minute: float = \
-                self.a_revolutions_per_minute.return_revolutions_per_minute()
-            tmp_is_wrong_way: bool = self.a_wrong_way.return_is_wrong_way()
 
             # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
             tmp_car_offset_distance: float
@@ -274,14 +271,13 @@ class Game:
                 str(tmp_speed_mph),
                 str(round(tmp_car_offset_distance, 2)),
                 str(round(tmp_lap_progress, 2)),
-                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction)),
-                str(round(tmp_revolutions_per_minute, 2)),
-                str(tmp_is_wrong_way)
+                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
             ])
 
             backup_screenshot: ndarray = self.a_screenshot
             self.show_graph(par_image_path=
-                            'h:/diplomka_vysledky/results/short_race/sixth_iteration_training' \
+                            'h:/diplomka_vysledky/results/short_race/'
+                            'first_experiment_fixed_bugs'
                             '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
@@ -500,9 +496,7 @@ class Game:
             "Speed: " + par_array_of_text[0] + " MPH",
             "Road Offset: " + par_array_of_text[1] + "",
             "Completed: " + par_array_of_text[2] + "%",
-            "Incline: " + par_array_of_text[3] + "",
-            "RPM: " + par_array_of_text[4] + "",
-            "Wrong Way: " + par_array_of_text[5] + ""
+            "Incline: " + par_array_of_text[3] + ""
         ]
 
         text_size, _ = \

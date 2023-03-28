@@ -52,8 +52,8 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     """
     settings = {
         'create_scatter_plot': False,
-        'load_previous_model': True,
-        'previous_model_iter_number': 510
+        'load_previous_model': False,
+        'previous_model_iter_number': 0
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Printer.print_basic(torch.version.cuda, "MAIN")
@@ -61,7 +61,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'sixth_iteration_training'
+    name = 'first_experiment_fixed_bugs'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
@@ -89,7 +89,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
         os.mkdir(os.path.abspath(path))
         Printer.print_success("new directory has been created", "MAIN")
 
-    dim1 = 25
+    dim1 = 4
     count_of_actions = 8
     count_of_features = 8448
 

@@ -63,8 +63,6 @@ class Env:
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
 
-        self.a_state_matrix = np.zeros((5, 5), dtype=float) - 1
-
     def make_state(self):
         """
         Generates the state tuple to be used in the next step of the environment.
@@ -89,54 +87,14 @@ class Env:
             par_incline_center=tmp_tuple_with_values[3]
         )
 
-        tmp_normalized_car_state_from_game = self.normalize_state_values(tmp_car_state_from_game)
-
-        state = self.calculate_state(
-            par_action_taken=-1,
-            par_current_car_state=tmp_normalized_car_state_from_game)
+        state = torch.tensor([tmp_car_state_from_game.speed_mph,
+                              tmp_car_state_from_game.distance_offset_center,
+                              tmp_car_state_from_game.lap_progress,
+                              tmp_car_state_from_game.incline_center])
 
         state = state.numpy()
 
         return state, tmp_reward, terminal
-
-    def normalize_state_values(self, par_car_state_not_normalized: CarState) -> CarState:
-        """
-        Normalizes the input state values and returns a tuple of normalized values.
-
-        Args:
-            par_car_state_not_normalized (CarState): A CarState object of unnormalized state
-                values, including the car speed, distance offset, lap progress, and direction
-                offset.
-
-        Returns:
-            CarState: A CarState object of normalized state values, including the
-                normalized car speed, normalized distance offset, normalized lap progress,
-                and normalized direction offset.
-        """
-        tmp_car_top_speed: float = 111
-        tmp_normalized_speed = par_car_state_not_normalized.speed_mph / tmp_car_top_speed
-
-        if par_car_state_not_normalized.distance_offset_center >= 0:
-            tmp_normalized_distance_offset: float = 1
-        elif par_car_state_not_normalized.distance_offset_center >= -1:
-            tmp_normalized_distance_offset: float = \
-                1 + par_car_state_not_normalized.distance_offset_center
-        elif par_car_state_not_normalized.distance_offset_center >= -50:
-            tmp_normalized_distance_offset: float = \
-                (1 + par_car_state_not_normalized.distance_offset_center) / 49
-        else:
-            tmp_normalized_distance_offset: float = -1
-
-        tmp_normalized_lap_progress: float = par_car_state_not_normalized.lap_progress / 100
-
-        tmp_normalized_direction_offset: float = par_car_state_not_normalized.incline_center
-
-        return CarState(
-            par_speed_mph=round(tmp_normalized_speed, ndigits=6),
-            par_distance_offset_center=round(tmp_normalized_distance_offset, ndigits=6),
-            par_lap_progress=round(tmp_normalized_lap_progress, ndigits=5),
-            par_incline_center=tmp_normalized_direction_offset
-        )
 
     def reset(self):
         """
@@ -233,54 +191,10 @@ class Env:
 
         self.update_lap_curr(tmp_lap_progress)
 
-        tmp_normalized_car_state: CarState = \
-            self.normalize_state_values(CarState(par_speed_mph=tmp_speed,
-                                                 par_distance_offset_center=tmp_car_distance_offset,
-                                                 par_lap_progress=tmp_lap_progress,
-                                                 par_incline_center=tmp_car_direction_offset))
-
-        new_state = self.calculate_state(
-            par_action_taken=action,
-            par_current_car_state=tmp_normalized_car_state
-        )
-
-        # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
-        #                          tmp_lap_progress, tmp_car_direction_offset])
+        new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
+                                  tmp_lap_progress, tmp_car_direction_offset])
 
         return new_state, reward, terminal, self.a_step_counter
-
-    def calculate_state(self, par_action_taken: int,
-                        par_current_car_state: CarState) -> torch.tensor:
-        """
-        Shifts the rows of the state matrix down by one row and inserts the new input parameters
-        in the first row. Prints the updated matrix.
-
-        Args:
-            par_action_taken: The current action by the car from th environment [ACTION_TAKEN]
-            par_current_car_state: A object of CarState class representing the current
-                car state: 
-                    [CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER]
-
-        Returns:
-            Torch Tensor representing state as a tensor
-        """
-        current_inputs_rounded: tuple[int, float, float, float, float] = (
-            par_action_taken,
-            round(par_current_car_state.speed_mph, ndigits=6),
-            round(par_current_car_state.distance_offset_center, ndigits=6),
-            round(par_current_car_state.lap_progress, ndigits=5),
-            par_current_car_state.incline_center
-        )
-
-        # shift the rows down
-        self.a_state_matrix[1:, :] = self.a_state_matrix[:-1, :]
-        # insert the new parameters in the first row
-        self.a_state_matrix[0, :] = current_inputs_rounded
-        # print_utils the updated matrix
-        # print_utils("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
-        # print_utils(self.a_state_matrix)
-
-        return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
         """
