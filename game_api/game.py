@@ -273,7 +273,7 @@ class Game:
 
             self.show_graph(par_image_path=
                             'h:/diplomka_vysledky/results/'
-                            'short_race/fourth_iteration_training_normalization_fixed_bugs'
+                            'short_race/experiment_partial_terminal_lap'
                             '/scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant

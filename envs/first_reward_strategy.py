@@ -77,7 +77,7 @@ class FirstRewardStrategy(ARewardStrategy):
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
                 print("Exceeded Step Limit")
-                reward += -1
+                reward += ((tmp_lap_progress / 5) - 1)
             if tmp_lap_progress >= 10:
                 reward += 1
                 print("Lap Complete")
