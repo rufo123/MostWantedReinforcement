@@ -48,6 +48,12 @@ class Game:
     """
     Class Which Acts as an API with the game Need for Speed: Most Wanted (2005)
     """
+    api_settings = {
+        'game_path': r'F:\Games Folder\Electronic Arts\Need for Speed Most '
+                     r'Wanted\speed.exe',
+        'cheat_engine_path': r'C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64.exe',
+        'game_process_name': 'Need for Speed\u2122 Most Wanted',
+    }
     a_threshold = 100
     a_ratio = 3
 
@@ -57,9 +63,8 @@ class Game:
     a_image: ndarray
     a_screenshot: ndarray
 
-    a_game_filename: string = r'F:\Games Folder\Electronic Arts\Need for Speed Most ' \
-                              r'Wanted\speed.exe'
-    a_cheat_engine_filename: string = r'C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64.exe'
+    a_game_filename: string = api_settings['game_path']
+    a_cheat_engine_filename: string = api_settings['cheat_engine_path']
 
     a_gps: GPS
 
@@ -178,7 +183,7 @@ class Game:
 
         self.a_wrong_way = WrongWay()
 
-        self.a_cheat_engine.start_cheat_engine()
+        self.a_cheat_engine.start_cheat_engine(self.api_settings['game_process_name'])
         self.a_cheat_engine.set_speed(self.a_speed)
 
         self.a_is_recording = False
@@ -201,15 +206,19 @@ class Game:
 
         self.a_cycles_passed = 0
 
-        par_game_inputs.game_initialization_inputs.put((self.a_race_initialised, self.a_speed))
+        par_game_inputs.game_initialization_inputs.put((
+            self.a_race_initialised,
+            self.a_speed
+        ))
 
-    def main_loop(self, par_game_inputs: GameInputs):
+    def main_loop(self, par_game_inputs: GameInputs, par_results_path: str):
         """
         Main Loop That Controls All The Game Logic
 
         Args:
             par_game_inputs (GameInputs): An instance of the GameInputs class containing the
                 inputs for the game.
+            par_results_path (str): Path of the folder containing results including graph images
 
         Returns:
             None: This method doesn't return anything.
@@ -238,9 +247,6 @@ class Game:
 
             tmp_speed_mph: int = self.a_speedometer.return_speed_mph()
             tmp_lap_progress: float = self.a_lap_progress.return_lap_completed_percent()
-            tmp_revolutions_per_minute: float = \
-                self.a_revolutions_per_minute.return_revolutions_per_minute()
-            tmp_is_wrong_way: bool = self.a_wrong_way.return_is_wrong_way()
 
             # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
             tmp_car_offset_distance: float
@@ -259,9 +265,7 @@ class Game:
                 str(tmp_speed_mph),
                 str(round(tmp_car_offset_distance, 2)),
                 str(round(tmp_lap_progress, 2)),
-                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction)),
-                str(round(tmp_revolutions_per_minute, 2)),
-                str(tmp_is_wrong_way)
+                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
             ])
 
             self.show_texts_on_image(par_image=self.a_screenshot,
@@ -271,10 +275,7 @@ class Game:
 
             cv2.imshow('Main Vision', self.a_screenshot)
 
-            self.show_graph(par_image_path=
-                            'h:/diplomka_vysledky/results/'
-                            'short_race/experiment_partial_terminal_lap'
-                            '/scatter_plot.png')
+            self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
 
@@ -405,9 +406,7 @@ class Game:
             "Speed: " + par_array_of_text[0] + " MPH",
             "Road Offset: " + par_array_of_text[1] + "",
             "Completed: " + par_array_of_text[2] + "%",
-            "Incline: " + par_array_of_text[3] + "",
-            "RPM: " + par_array_of_text[4] + "",
-            "Wrong Way: " + par_array_of_text[5] + ""
+            "Incline: " + par_array_of_text[3] + ""
         ]
 
         text_size, _ = \
@@ -455,7 +454,7 @@ class Game:
                - int: Height of the captured image
         """
         # Find the game window
-        hwnd = win32gui.FindWindow(None, 'Need for Speed\u2122 Most Wanted')
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_process_name'])
 
         # Get the window device context
         w_dc = win32gui.GetWindowDC(hwnd)
@@ -620,7 +619,7 @@ class Game:
         """
         Forces Windows to Focus On Game (Bring It To Front)
         """
-        hwnd = win32gui.FindWindow(None, 'Need for Speed\u2122 Most Wanted')
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_process_name'])
         win32gui.SetForegroundWindow(hwnd)
 
     def is_in_correct_restart_state(self, par_screen_image: ndarray) -> RestartStateEnum:

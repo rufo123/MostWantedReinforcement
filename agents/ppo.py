@@ -17,7 +17,7 @@ from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
 from game_inputs import GameInputs
-from utils.stats import MovingAverageScore, write_to_file
+from utils.stats import MovingAverageScore, write_to_file, append_to_file
 
 
 # methods support_to_scalar and scalar_to_support are implemented
@@ -390,12 +390,14 @@ class Agent:
             elapsed_time = datetime.now() - self.start_time
             hours_taken = elapsed_time.total_seconds() / 3600
 
-            logs_score += '\n' + str(iteration) + ',' \
-                          + str(score.get_count_of_episodes()) + ',' \
-                          + str(avg_score) + ',' \
-                          + str(score.get_best_avg_score()) + ',' \
-                          + str(round(hours_taken, 2)) + ',' \
-                          + str(round(iteration_steps_took))
+            actual_score: str = '\n' + str(iteration) + ',' \
+                                + str(score.get_count_of_episodes()) + ',' \
+                                + str(avg_score) + ',' \
+                                + str(score.get_best_avg_score()) + ',' \
+                                + str(round(hours_taken, 2)) + ',' \
+                                + str(round(iteration_steps_took))
+
+            logs_score += actual_score
 
             logs_loss += '\n' + str(iteration) + ',' \
                          + str(avg_score) + ',' \
@@ -406,7 +408,12 @@ class Agent:
             if iteration % 10 == 0:
                 write_to_file(logs_score, self.path + 'logs_score.txt')
                 write_to_file(logs_loss, self.path + 'logs_loss.txt')
-                graph.make_graph.scatter_plot_save(self.path + 'logs_score.txt', self.path)
+                append_to_file(
+                    par_filename=self.path + 'logs_final.txt',
+                    par_log_without_header=actual_score,
+                    par_log_with_header=logs_score
+                )
+                graph.make_graph.scatter_plot_save(self.path + 'logs_final.txt', self.path)
                 torch.save(self.model.state_dict(), self.path + 'latest_model' + '.pt')
                 with open(self.path + 'latest_score', "wb") as loaded_score:
                     pickle.dump(score, loaded_score)

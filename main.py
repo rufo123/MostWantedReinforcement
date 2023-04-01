@@ -5,6 +5,7 @@ If you are importing this module you are doing something wrong!
 import multiprocessing
 import os
 import time
+from typing import Union, Callable
 
 import torch
 
@@ -15,6 +16,12 @@ from game_api.game import Game
 from game_inputs import GameInputs
 from models.short_race import PolicyValueModel
 from utils.stats import write_to_file
+
+
+a_global_settings: dict[str, Union[str, Callable[[], str]]] = {
+    'name': 'experiment_partial_terminal_lap',
+    'path': lambda: f'h:/diplomka_vysledky/results/short_race/{a_global_settings["name"]}/'
+}
 
 
 def game_loop_thread(par_game_inputs: GameInputs) -> None:
@@ -29,8 +36,13 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
         None: This function doesn't return anything.
     """
     tmp_game: Game = Game()
+    results_path: str = a_global_settings['path']()
     try:
-        tmp_game.main_loop(par_game_inputs)
+
+        tmp_game.main_loop(
+            par_game_inputs=par_game_inputs,
+            par_results_path=results_path
+        )
     except Exception as exception:
         print(f"An error occurred in Game Api: {exception}")
         raise
@@ -39,7 +51,7 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
 # pylint: disable=too-many-locals
 # pylint: disable=too-many-statements
 def agent_loop(par_game_inputs: GameInputs) -> None:
-    """
+    """w
     A function representing the agent loop.
 
     Args:
@@ -52,7 +64,7 @@ a
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 2760
+        'previous_model_iter_number': 1980
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(torch.version.cuda)
@@ -60,7 +72,6 @@ a
     # set_start_method('spawn')
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    name = 'experiment_partial_terminal_lap'
     env_param = par_game_inputs
     count_of_iterations = 20000
     count_of_processes = 1
@@ -78,7 +89,7 @@ a
 
     value_support_size = 1
 
-    path = 'h:/diplomka_vysledky/results/short_race/' + name + '/'
+    path = a_global_settings['path']()
 
     path_logs_score = path + 'logs_score_results.txt'
 

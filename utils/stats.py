@@ -2,21 +2,40 @@
 Module: This module contains a MovingAverageScore class and a write_to_file function for logging.
 """
 import math
+import os
 
 import numpy as np
 
 
-def write_to_file(log: str, filename: str):
+def write_to_file(par_log: str, par_filename: str):
     """
      Write log string to file.
 
      Args:
-         log (str): Log string to write to file
-         filename (str): Name of the file to write to
+         par_log (str): Log string to write to file
+         par_filename (str): Name of the file to write to
      """
-    with open(filename, "w", encoding="utf-8") as file:
-        file.write(log)
+    with open(par_filename, "w", encoding="utf-8") as file:
+        file.write(par_log)
         file.close()
+
+
+def append_to_file(par_filename: str, par_log_without_header: str, par_log_with_header: str = ''):
+    """
+    Append log string to file.
+
+    Args:
+        par_log_without_header (str): Log string to append to file if file already exists and is
+         not empty
+        par_log_with_header (str): Log string to write to file if file does not exist or is empty
+        par_filename (str): Name of the file to append to
+    """
+    if os.path.isfile(par_filename) and os.stat(par_filename).st_size != 0:
+        with open(par_filename, "a", encoding="utf-8") as file:
+            file.write(par_log_without_header + '\n')
+    else:
+        with open(par_filename, "w", encoding="utf-8") as file:
+            file.write(par_log_with_header + '\n')
 
 
 class MovingAverageScore:
