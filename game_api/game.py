@@ -34,11 +34,17 @@ from game_memory_reading.revolutions_per_minute import RevolutionsPerMinute
 from game_memory_reading.speedometer import Speedometer
 from game_memory_reading.wrong_way import WrongWay
 from gps import GPS
+from state.a_game_state import AGameState
+from state.game_state_not_connected import GameStateNotConnected
+from state.game_state_restarting import GameStateRestarting
+from state.game_state_starting import GameStateStarting
+from state.game_state_training import GameStateTraining
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
 from strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
 from utils.enums.restart_states_enum import RestartStateEnum
+from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
 
 
@@ -53,6 +59,7 @@ class Game:
                      r'Wanted\speed.exe',
         'cheat_engine_path': r'C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64.exe',
         'game_process_name': 'Need for Speed\u2122 Most Wanted',
+        'game_title_name': 'Need for Speed\u2122 Most Wanted',
     }
     a_threshold = 100
     a_ratio = 3
@@ -108,6 +115,8 @@ class Game:
 
     a_image_manipulation: ImageManipulation
 
+    a_dictionary_menus: dict[str, str]
+
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
         self.a_image_manipulation.load_comparable_images()
@@ -125,6 +134,12 @@ class Game:
             par_font_thickness=2,
             par_line_type=2
         )
+        self.a_game_state = GameStateNotConnected()
+        self.a_dictionary_menus = {
+            'restart_menu': 'resume_race_text',
+            'standing_menu': 'standings_menu',
+            'attention_restart': 'attention_restart'
+        }
 
         cuda.printCudaDeviceInfo(0)
 
@@ -164,6 +179,7 @@ class Game:
         Returns:
             None
         """
+        self.a_game_state = GameStateStarting()
         self.start_game()
         # self.start_cheat_engine()
 
@@ -203,6 +219,8 @@ class Game:
         time.sleep(3)
 
         self.a_race_initialised = True
+
+        self.a_controls.release_all_keys()
 
         self.a_cycles_passed = 0
 
@@ -268,13 +286,7 @@ class Game:
                 str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
             ])
 
-            self.show_texts_on_image(par_image=self.a_screenshot,
-                                     par_font_color=(159, 43, 104),
-                                     par_array_of_text=strings_to_show
-                                     )
-
-            cv2.imshow('Main Vision', self.a_screenshot)
-
+            backup_screenshot: ndarray = self.a_screenshot
             self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
@@ -289,8 +301,13 @@ class Game:
             while not par_game_inputs.game_restart_inputs.empty():
                 tmp_needs_restart: bool = par_game_inputs.game_restart_inputs.get()
                 if tmp_needs_restart:
+                    self.a_game_state = GameStateRestarting()
+                    self.update_state_on_screen(self.a_screenshot)
+
                     par_game_inputs.game_restart_inputs.put(tmp_needs_restart)
                     self.reset_game_race(0.7 / float(self.a_speed), 0.01 / float(self.a_speed))
+
+                    self.a_game_state = GameStateTraining()
                     par_game_inputs.game_restart_inputs.get()
 
             # .empty() returns False or True, it is not function to empty the Queue
@@ -306,6 +323,16 @@ class Game:
                  self.a_lap_progress.return_lap_completed_percent(),
                  self.a_car_direction_offset, self.get_revolutions_per_minute(),
                  self.get_is_wrong_way()))
+
+            self.show_texts_on_image(par_image=backup_screenshot,
+                                     par_font_color=(159, 43, 104),
+                                     par_array_of_text=strings_to_show
+                                     )
+
+            self.show_state_on_image(par_image=backup_screenshot,
+                                     par_game_state=self.a_game_state)
+
+            cv2.imshow('Main Vision', backup_screenshot)
 
     def is_race_initialised(self) -> bool:
         """
@@ -377,6 +404,75 @@ class Game:
             image = cv2.imread(os.path.abspath(par_image_path))
         if image is not None:
             cv2.imshow('Graph: ', image)
+
+    def update_state_on_screen(self, par_image: ndarray) -> None:
+        """
+        Updates the game state on the screen.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+    
+        Returns:
+            None
+        """
+        self.show_state_on_image(par_image=par_image,
+                                 par_game_state=self.a_game_state)
+
+        cv2.imshow('Main Vision', self.a_screenshot)
+
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+
+    def show_state_on_image(self, par_image: ndarray,
+                            par_game_state: AGameState) -> None:
+        """
+        Displays the game state on an image.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+            par_game_state (AGameState): The current game state object.
+
+        Returns:
+            None
+        """
+        tmp_new_font_scale: float = self.a_font_settings.font_scale
+
+        test_to_show: str = par_game_state.return_state_text()
+
+        text_size, _ = \
+            cv2.getTextSize(
+                test_to_show,
+                self.a_font_settings.font,
+                tmp_new_font_scale,
+                self.a_font_settings.thickness
+            )
+
+        text_height = text_size[1] + self.a_font_settings.thickness
+        text_splitter_height = int(text_height / 2)
+        x_bottom_left_text_coordinate: int = int(self.a_width / 2) - int(text_size[0] / 2)
+        y_bottom_left_text_coordinate: int = self.a_height - text_height
+
+        bottom_left_corner_of_text: tuple[int, int] = (
+            x_bottom_left_text_coordinate,
+            y_bottom_left_text_coordinate
+        )
+        # Draw the text with an outline in white color
+        cv2.putText(par_image,
+                    test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    (255, 255, 255),
+                    abs(self.a_font_settings.thickness) + 3,
+                    self.a_font_settings.line_type)
+        cv2.putText(par_image, test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    par_game_state.return_color_representation(),
+                    self.a_font_settings.thickness,
+                    self.a_font_settings.line_type)
+        y_bottom_left_text_coordinate += text_height + text_splitter_height
 
     def show_texts_on_image(self, par_image: ndarray,
                             par_font_color: tuple[int, int, int],
@@ -454,7 +550,7 @@ class Game:
                - int: Height of the captured image
         """
         # Find the game window
-        hwnd = win32gui.FindWindow(None, self.api_settings['game_process_name'])
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_title_name'])
 
         # Get the window device context
         w_dc = win32gui.GetWindowDC(hwnd)
@@ -619,7 +715,7 @@ class Game:
         """
         Forces Windows to Focus On Game (Bring It To Front)
         """
-        hwnd = win32gui.FindWindow(None, self.api_settings['game_process_name'])
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_title_name'])
         win32gui.SetForegroundWindow(hwnd)
 
     def is_in_correct_restart_state(self, par_screen_image: ndarray) -> RestartStateEnum:
@@ -633,24 +729,21 @@ class Game:
             A value of RestartStateEnum indicating whether the screen is in the restart state, 
             standings state or an unknown state.
         """
-        restart_menu: str = 'resume_race_text'
-        standing_menu: str = 'standings_menu'
-        if restart_menu not in self.a_image_manipulation.comparable_images:
-            print(f"No image found with name {restart_menu}")
-            return RestartStateEnum.UNKNOWN_STATE
-        if standing_menu not in self.a_image_manipulation.comparable_images:
-            print(f"No image found with name {standing_menu}")
-            return RestartStateEnum.UNKNOWN_STATE
 
-        if self.a_image_manipulation.match_template(par_screen_image,
-                                                    self.a_image_manipulation.comparable_images[
-                                                        restart_menu]):
-            return RestartStateEnum.RESTART_STATE
+        for menu_enum_name, menu_image_string_name in self.a_dictionary_menus.items():
+            if menu_image_string_name not in self.a_image_manipulation.comparable_images:
+                Printer.print_error(f"No image found with name {menu_image_string_name}", "GAME")
+                return RestartStateEnum.UNKNOWN_STATE
 
-        if self.a_image_manipulation.match_template(par_screen_image,
-                                                    self.a_image_manipulation.comparable_images[
-                                                        standing_menu]):
-            return RestartStateEnum.STANDINGS_STATE
+            if self.a_image_manipulation.match_template(par_screen_image,
+                                                        self.a_image_manipulation.comparable_images[
+                                                            menu_image_string_name]):
+                if menu_enum_name == 'restart_menu':
+                    return RestartStateEnum.RESTART_STATE
+                if menu_enum_name == 'standing_menu':
+                    return RestartStateEnum.STANDINGS_STATE
+                if menu_enum_name == 'attention_restart':
+                    return RestartStateEnum.ATTENTION_RESTART_STATE
 
         return RestartStateEnum.UNKNOWN_STATE
 
@@ -674,7 +767,8 @@ class Game:
 
         while tmp_current_state != RestartStateEnum.RESTART_STATE:
             tmp_current_state = self.is_in_correct_restart_state(self.window_capture()[0])
-            if tmp_current_state == RestartStateEnum.UNKNOWN_STATE:
+            if tmp_current_state in [RestartStateEnum.UNKNOWN_STATE,
+                                     RestartStateEnum.ATTENTION_RESTART_STATE]:
                 self.a_controls.press_and_release_key(self.a_controls.ESCAPE,
                                                       par_sleep_time_key_press, True)
                 time.sleep(par_sleep_time_delay)
@@ -685,15 +779,31 @@ class Game:
 
         time.sleep(par_sleep_time_delay)
 
-        keys_to_press: list[int] = [self.a_controls.RIGHT_KEY, self.a_controls.ENTER,
-                                    self.a_controls.LEFT_KEY, self.a_controls.ENTER]
-        # Then We Proceed to The Right - Restart Button
-        # Press Enter - Restarts The Race
-        # Then Prompt Will Appear - We Move To The OK Button
-        # Press Enter - Accepts The Prompt
-        for key_to_press in keys_to_press:
-            self.a_controls.press_and_release_key(key_to_press, par_sleep_time_key_press, True)
-            time.sleep(par_sleep_time_delay)
+        tmp_is_not_in_attention_state: bool = True
+        while tmp_is_not_in_attention_state:
+
+            keys_to_press: list[int] = [self.a_controls.RIGHT_KEY, self.a_controls.ENTER,
+                                        self.a_controls.LEFT_KEY]
+            # Then We Proceed to The Right - Restart Button
+            # Press Enter - Restarts The Race
+            # Then Prompt Will Appear - We Move To The OK Button
+            for key_to_press in keys_to_press:
+                self.a_controls.press_and_release_key(key_to_press, par_sleep_time_key_press, True)
+                time.sleep(par_sleep_time_delay)
+
+            tmp_restart_state = self.is_in_correct_restart_state(self.window_capture()[0])
+            if tmp_restart_state == RestartStateEnum.ATTENTION_RESTART_STATE:
+                tmp_is_not_in_attention_state = False
+            else:
+                self.a_controls.press_and_release_key(self.a_controls.ESCAPE,
+                                                      par_sleep_time_key_press, True)
+                time.sleep(par_sleep_time_delay)
+                tmp_is_not_in_attention_state = True
+
+        # If the prompt with Attention (Do you Really Want to Restart) appears press Enter
+        time.sleep(par_sleep_time_delay)
+        self.a_controls.press_and_release_key(self.a_controls.ENTER, par_sleep_time_key_press, True)
+        time.sleep(par_sleep_time_delay)
 
         time.sleep(1 * self.a_speed)
 

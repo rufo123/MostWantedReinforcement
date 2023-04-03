@@ -15,11 +15,12 @@ from envs.short_race_env import create_env
 from game_api.game import Game
 from game_inputs import GameInputs
 from models.short_race import PolicyValueModel
+from utils.print_utils.printer import Printer
 from utils.stats import write_to_file
 
 
 a_global_settings: dict[str, Union[str, Callable[[], str]]] = {
-    'name': 'experiment_partial_terminal_lap',
+    'name': 'experiment_partial_terminal_lap_smaller_reward',
     'path': lambda: f'h:/diplomka_vysledky/results/short_race/{a_global_settings["name"]}/'
 }
 
@@ -44,32 +45,31 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
             par_results_path=results_path
         )
     except Exception as exception:
-        print(f"An error occurred in Game Api: {exception}")
+        Printer.print_error("An error occurred in Game Api", "MAIN", exception)
         raise
 
 
 # pylint: disable=too-many-locals
 # pylint: disable=too-many-statements
 def agent_loop(par_game_inputs: GameInputs) -> None:
-    """w
+    """
     A function representing the agent loop.
 
     Args:
         par_game_inputs (GameInputs): An instance of the GameInputs class containing the inputs for
             the game.
-a
-    Returns:a
+
+    Returns:
         None: This function doesn't return anything.
     """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 1980
+        'previous_model_iter_number': 1410
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(torch.version.cuda)
-    print('device: ', device)
-    # set_start_method('spawn')
+    Printer.print_basic(torch.version.cuda, "MAIN")
+    Printer.print_basic("device: " + str(device))
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     env_param = par_game_inputs
@@ -94,10 +94,10 @@ a
     path_logs_score = path + 'logs_score_results.txt'
 
     if os.path.isdir(os.path.abspath(path)):
-        print('directory has already existed')
+        Printer.print_basic("directory has already existed", "MAIN")
     else:
         os.mkdir(os.path.abspath(path))
-        print('new directory has been created')
+        Printer.print_success("new directory has been created", "MAIN")
 
     dim1 = 25
     count_of_actions = 8
@@ -131,7 +131,7 @@ a
     par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
 
     while not tmp_is_game_started:
-        print("Waiting for Race to Initialise")
+        Printer.print_info("Waiting for Race to Initialise", "MAIN")
 
         tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
 
@@ -144,8 +144,6 @@ a
     iteration_number = iteration_number + 1
     time_started = time.perf_counter()
 
-    print()
-
     try:
         agent.train(env_param, create_env, count_of_actions,
                     count_of_iterations=count_of_iterations,
@@ -155,7 +153,7 @@ a
                     count_of_epochs=count_of_epochs,
                     batch_size=batch_size, input_dim=dim1)
     except Exception as exception:
-        print(f"An exception occurred during training:: {exception}")
+        Printer.print_error("An exception occurred during training", "MAIN", exception)
         raise
     # except Exception as e:
     #     i = i - 1
@@ -169,10 +167,9 @@ a
 
 
 if __name__ == '__main__':
-    # graph.make_graph.scatter_plot_show(os.path.abspath('H:\\diplomka_vysledky\\results\\'
-    #                                                   'short_race\\fourth_iteration_training'
-    #                                                   '\\tempscore\\logs_score.txt'))
-    # exit()
+    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + '\\score_final_exp2.txt'), 'avg_score')
+    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + '\\score_final_exp2.txt'), 'steps_took')
+    #exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

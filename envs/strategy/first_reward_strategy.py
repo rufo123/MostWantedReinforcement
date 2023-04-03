@@ -8,7 +8,9 @@ Classes:
     FirstRewardStrategy
 
 """
-from envs.a_reward_strategy import ARewardStrategy
+from car_states.car_state_in_environment import CarStateInEnvironment
+from envs.strategy.a_reward_strategy import ARewardStrategy
+from utils.print_utils.printer import Printer
 
 
 # pylint: disable=too-few-public-methods
@@ -27,7 +29,7 @@ class FirstRewardStrategy(ARewardStrategy):
         Not Completing The Race in specified count_of_steps
     """
 
-    def evaluate_reward(self, par_env_inputs: tuple[float, float, float, float, float],
+    def evaluate_reward(self, par_env_inputs: CarStateInEnvironment,
                         par_game_steps_per_episode: int,
                         par_env_steps_counter: int,
                         par_terminal: bool) -> tuple[float, bool]:
@@ -35,8 +37,8 @@ class FirstRewardStrategy(ARewardStrategy):
         This method calculates the reward of the current step for the ShortRaceEnv environment.
 
         Args:
-            par_env_inputs (tuple[float, float, float, float]): The current state of the
-                environment.
+            par_env_inputs (CarStateInEnvironment): Object containing car state represented by 
+                the environment
             par_game_steps_per_episode (int): Count of Configured Game Steps per Env Episode
             par_env_steps_counter: (int) Count of passed game Steps in Env
             par_terminal (bool): If the environment has reached a terminal state.
@@ -46,12 +48,6 @@ class FirstRewardStrategy(ARewardStrategy):
         """
         reward: float = 0
         terminal: bool = par_terminal
-
-        # tmp_speed: float = par_env_inputs[0]
-        tmp_car_distance_offset: float = par_env_inputs[1]
-        tmp_lap_progress: float = par_env_inputs[2]
-        tmp_lap_progress_diff: float = par_env_inputs[3]
-        # tmp_car_direction_offset = par_env_inputs[4]
 
         # Ako daleko som od idealnej linie?
 
@@ -69,19 +65,22 @@ class FirstRewardStrategy(ARewardStrategy):
 
         tmp_normalization_value: int = par_game_steps_per_episode
 
-        reward += self.__lap_progress_reward(tmp_lap_progress_diff, tmp_normalization_value)
+        reward += self.__lap_progress_reward(par_env_inputs.lap_progress_difference,
+                                             tmp_normalization_value)
 
-        reward += self.__distance_offset_reward(tmp_car_distance_offset, tmp_normalization_value)
+        reward += self.__distance_offset_reward(par_env_inputs.distance_offset_center,
+                                                tmp_normalization_value)
 
-        if par_env_steps_counter >= par_game_steps_per_episode or tmp_lap_progress >= 10:
+        if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
-                print("Exceeded Step Limit")
-                reward += ((tmp_lap_progress / 5) - 1)
-            if tmp_lap_progress >= 10:
+                Printer.print_info("Exceeded Step Limit", "REWARD_STRATEGY",)
+                reward += ((par_env_inputs.lap_progress / 5) - 1)
+            if par_env_inputs.lap_progress >= 10:
                 reward += 1
-                print("Lap Complete")
-            print("Terminal")
+                Printer.print_success("Lap Complete", "REWARD_STRATEGY")
+                print()
+            Printer.print_info("TERMINAL STATE ACHIEVED", "REWARD_STRATEGY")
         return reward, terminal
 
     def __distance_offset_reward(self, par_car_distance_offset: float,
@@ -149,6 +148,5 @@ class FirstRewardStrategy(ARewardStrategy):
             to the magnitude of the lap progress difference, divided by the
             normalization value.
         """
-
-        print("Progress: " + str(par_lap_progress_diff))
+        Printer.print_basic("Progress: " + str(par_lap_progress_diff), "FIRST_REWARD_STRATEGY")
         return par_lap_progress_diff / par_normalization_value

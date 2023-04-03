@@ -42,6 +42,18 @@ class Controls(metaclass=ThreadSafeSingleton):
     def __init__(self, ):
         self.a_lock = Lock()
 
+    def reset_directional_controls(self) -> None:
+        """
+        Resets all directional key presses, by pressing and releasing it for 0 seconds
+        """
+        keys_to_reset: list[int] = [
+            self.W_KEY, self.D_KEY, self.S_KEY, self.A_KEY,
+            self.UP_KEY, self.RIGHT_KEY, self.DOWN_KEY, self.LEFT_KEY
+        ]
+
+        for key_to_reset in keys_to_reset:
+            self.press_and_release_key(key_to_reset, 0, True)
+
     def press_key(self, par_hex_key_code: int) -> None:
         """
         Presses key via Direct Input
@@ -67,7 +79,7 @@ class Controls(metaclass=ThreadSafeSingleton):
         ctypes.windll.user32.SendInput(1, ctypes.pointer(tmp_x), ctypes.sizeof(tmp_x))
 
     def press_and_release_key(self, par_hex_key_code: int, par_sleep_time: float = 1,
-                              par_can_bypass_critical_check: bool = False) -> None:
+                              par_can_bypass_critical_check: bool = False) -> bool:
         """
         Presses and Releases Key Via Direct Input
         Waits if Critical Action Execution is set to True
@@ -77,6 +89,7 @@ class Controls(metaclass=ThreadSafeSingleton):
         :param par_can_bypass_critical_check: Skips Waiting for Critical Action Execution 
         to be set to False
         """
+        executed_correctly: bool = False
         self.check_critical_action(par_can_bypass_critical_check)
         with self.a_lock:
             self.release_all_keys()
@@ -84,10 +97,12 @@ class Controls(metaclass=ThreadSafeSingleton):
             time.sleep(par_sleep_time)
             self.release_key(par_hex_key_code)
             # time.sleep(par_sleep_time)
+            executed_correctly = True
+        return executed_correctly
 
     def press_and_release_two_keys(self, par_hex_key_code_first: int, par_hex_key_code_second: int,
                                    par_sleep_time: float = 1,
-                                   par_can_bypass_critical_check: bool = False):
+                                   par_can_bypass_critical_check: bool = False) -> bool:
         """
           Presses and Releases Key Via Direct Input
           Waits if Critical Action Execution is set to True
@@ -98,6 +113,7 @@ class Controls(metaclass=ThreadSafeSingleton):
           :param par_can_bypass_critical_check: Skips Waiting for Critical Action Execution to be
            set to False
           """
+        executed_correctly: bool = False
         self.check_critical_action(par_can_bypass_critical_check)
         with self.a_lock:
             self.release_all_keys()
@@ -107,6 +123,8 @@ class Controls(metaclass=ThreadSafeSingleton):
             self.release_key(par_hex_key_code_first)
             self.release_key(par_hex_key_code_second)
             # time.sleep(par_sleep_time/ 2)
+            executed_correctly = True
+        return executed_correctly
 
     def check_critical_action(self, par_can_bypass: False):
         """
@@ -132,74 +150,74 @@ class Controls(metaclass=ThreadSafeSingleton):
         Keys: [UP_KEY, RIGHT_KEY, DOWN_KEY, LEFT_KEY, HAND_BRAKE, ENTER, ESCAPE]
         """
         keys_to_release = [self.W_KEY, self.D_KEY, self.S_KEY, self.A_KEY,
-                           self.HAND_BRAKE, self.ENTER,
-                           self.ESCAPE]
+                           self.HAND_BRAKE, self.ENTER, self.ESCAPE, self.LEFT_KEY,
+                           self.UP_KEY, self.RIGHT_KEY, self.DOWN_KEY]
         for key in keys_to_release:
             if self.check_key_pressed(key):
                 self.release_key(key)
 
-    def forward(self, par_sleep_time: float = 1) -> None:
+    def forward(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Forward
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_key(self.W_KEY, par_sleep_time)
+        return self.press_and_release_key(self.W_KEY, par_sleep_time)
 
-    def backward(self, par_sleep_time: float = 1) -> None:
+    def backward(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Backward
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_key(self.S_KEY, par_sleep_time)
+        return self.press_and_release_key(self.S_KEY, par_sleep_time)
 
-    def left(self, par_sleep_time: float = 1) -> None:
+    def left(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Left
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_key(self.A_KEY, par_sleep_time)
+        return self.press_and_release_key(self.A_KEY, par_sleep_time)
 
-    def right(self, par_sleep_time: float = 1) -> None:
+    def right(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Right
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_key(self.D_KEY, par_sleep_time)
+        return self.press_and_release_key(self.D_KEY, par_sleep_time)
 
-    def forward_right(self, par_sleep_time: float = 1) -> None:
+    def forward_right(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Forward and Right
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_two_keys(self.W_KEY, self.D_KEY, par_sleep_time)
+        return self.press_and_release_two_keys(self.W_KEY, self.D_KEY, par_sleep_time)
 
-    def forward_left(self, par_sleep_time: float = 1) -> None:
+    def forward_left(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Forward and Left
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_two_keys(self.W_KEY, self.A_KEY, par_sleep_time)
+        return self.press_and_release_two_keys(self.W_KEY, self.A_KEY, par_sleep_time)
 
-    def backward_left(self, par_sleep_time: float = 1) -> None:
+    def backward_left(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Backward and Left
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_two_keys(self.S_KEY, self.A_KEY, par_sleep_time)
+        return self.press_and_release_two_keys(self.S_KEY, self.A_KEY, par_sleep_time)
 
-    def backward_right(self, par_sleep_time: float = 1) -> None:
+    def backward_right(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to Go Backward and Right
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_two_keys(self.S_KEY, self.D_KEY, par_sleep_time)
+        return self.press_and_release_two_keys(self.S_KEY, self.D_KEY, par_sleep_time)
 
-    def hand_brake(self, par_sleep_time: float = 1) -> None:
+    def hand_brake(self, par_sleep_time: float = 1) -> bool:
         """
         Execute Action to HandBrake
         :param par_sleep_time: Sleep Time Before Pressing and Releasing Key in Seconds
         """
-        self.press_and_release_key(self.HAND_BRAKE, par_sleep_time)
+        return self.press_and_release_key(self.HAND_BRAKE, par_sleep_time)
 
 
 PUL = ctypes.POINTER(ctypes.c_ulong)

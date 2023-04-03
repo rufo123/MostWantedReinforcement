@@ -7,16 +7,16 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def scatter_plot_show(from_filepath):
+def scatter_plot_show(par_from_filepath: str, par_column: str):
     """
     Plots a scatter plot of the data from a CSV file and shows it in a window.
 
     Args:
-        from_filepath (str): Filepath to the CSV file to plot.
+        par_from_filepath (str): Filepath to the CSV file to plot.
     """
-    d_f = pd.read_csv(from_filepath)
+    d_f = pd.read_csv(par_from_filepath)
 
-    fig = go.Figure([go.Scatter(x=d_f['iteration'], y=d_f['avg_score'])])
+    fig = go.Figure([go.Scatter(x=d_f['iteration'], y=d_f[par_column])])
     fig.update_layout(
         xaxis_title="Iteration",
         yaxis_title="Average score",

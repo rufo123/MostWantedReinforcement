@@ -17,6 +17,7 @@ from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
 from game_inputs import GameInputs
+from utils.print_utils.printer import Printer
 from utils.stats import MovingAverageScore, write_to_file, append_to_file
 
 
@@ -107,7 +108,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
         steps_taken_list = []
 
         for step in range(count_of_steps):
-            print("STEP: " + str(step))
+            Printer.print_basic("STEP: " + str(step), "AGENT")
             connection.send(observations.float())
             logits, values = connection.recv()
             probs = F.softmax(logits, dim=-1)
@@ -123,8 +124,8 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                     actions[idx, 0].item())
                 mem_rewards[step, idx, 0] = reward
                 game_score[idx] += reward
-                print('Single Reward: ' + str(reward))
-                print('Cumulative Reward: ' + str(game_score[idx]))
+                Printer.print_info("Single Reward: " + str(reward), "AGENT")
+                Printer.print_info("Cumulative Reward: " + str(game_score[idx]), "AGENT")
                 if reward < 0:
                     mem_non_terminals[step, idx, 0] = 0
                 if terminal:
@@ -228,7 +229,7 @@ class Agent:
         :param batch_size: the size of the batches used to update the network
         :param input_dim: the dimensionality of the observation space
         """
-        print('Training is starting')
+        Printer.print_info("Training is starting", "AGENT")
 
         logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took,steps_took'
         logs_loss = 'iteration,episode,policy,value,entropy'

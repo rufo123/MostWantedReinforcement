@@ -9,9 +9,12 @@ import torch
 from absl import flags
 
 from action_translator_enum import ActionTranslatorEnum
-from envs.a_reward_strategy import ARewardStrategy
-from envs.reward_strategy_enum import RewardStrategyEnum
+from car_states.car_state import CarState
+from car_states.car_state_in_environment import CarStateInEnvironment
+from envs.strategy.a_reward_strategy import ARewardStrategy
+from envs.strategy.reward_strategy_enum import RewardStrategyEnum
 from game_inputs import GameInputs
+from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
 
 FLAGS = flags.FLAGS
@@ -39,7 +42,7 @@ class Env:
         'game_steps_per_episode': 150,
         'visualize': True,
         'realtime': False,
-        'reward_strategy': RewardStrategyEnum.FIRST_REWARD_STRATEGY
+        'reward_strategy': RewardStrategyEnum.SECOND_REWARD_STRATEGY
     }
 
     def __init__(self, par_game_inputs: GameInputs):
@@ -73,69 +76,66 @@ class Env:
         tmp_reward: float = 0
         if self.a_game_inputs.agent_inputs_state is None:
             pass
-        print("Debug Call")
 
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
-            print("Waiting for Game API to send data (Make_State)")
+            Printer.print_info("Waiting for Game API to send data (Make_State)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
-        tmp_normalized_tuple_with_values = self.normalize_state_values(tmp_tuple_with_values)
+        tmp_car_state_from_game: CarState = CarState(
+            par_speed_mph=tmp_tuple_with_values[0],
+            par_distance_offset_center=tmp_tuple_with_values[1],
+            par_lap_progress=tmp_tuple_with_values[2],
+            par_incline_center=tmp_tuple_with_values[3]
+        )
 
-        tmp_speed: float = tmp_normalized_tuple_with_values[0]
-        tmp_car_distance_offset: float = tmp_normalized_tuple_with_values[1]
-        tmp_lap_progress: float = tmp_normalized_tuple_with_values[2]
-        tmp_car_direction_offset: int = tmp_normalized_tuple_with_values[3]
+        tmp_normalized_car_state_from_game = self.normalize_state_values(tmp_car_state_from_game)
 
-        new_state_input: tuple[int, float, float, float, int] = (
-            -1, tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_car_direction_offset)
-
-        state = self.calculate_state(new_state_input)
+        state = self.calculate_state(
+            par_action_taken=-1,
+            par_current_car_state=tmp_normalized_car_state_from_game)
 
         state = state.numpy()
 
         return state, tmp_reward, terminal
 
-    def normalize_state_values(self, par_state_inputs: tuple[float, float, float, int]) -> tuple[
-        float, float, float, int]:
+    def normalize_state_values(self, par_car_state_not_normalized: CarState) -> CarState:
         """
         Normalizes the input state values and returns a tuple of normalized values.
 
         Args:
-            par_state_inputs (tuple[float, float, float, int]): A tuple of unnormalized state
+            par_car_state_not_normalized (CarState): A CarState object of unnormalized state
                 values, including the car speed, distance offset, lap progress, and direction
                 offset.
 
         Returns:
-            tuple[float, float, float, int]: A tuple of normalized state values, including the
+            CarState: A CarState object of normalized state values, including the
                 normalized car speed, normalized distance offset, normalized lap progress,
                 and normalized direction offset.
         """
-        tmp_not_normalized_car_speed: float = par_state_inputs[0]
         tmp_car_top_speed: float = 111
-        tmp_normalized_speed = tmp_not_normalized_car_speed / tmp_car_top_speed
+        tmp_normalized_speed = par_car_state_not_normalized.speed_mph / tmp_car_top_speed
 
-        tmp_not_normalized_distance_offset: float = par_state_inputs[1]
-        if tmp_not_normalized_distance_offset >= 0:
+        if par_car_state_not_normalized.distance_offset_center >= 0:
             tmp_normalized_distance_offset: float = 1
-        elif tmp_not_normalized_distance_offset >= -1:
-            tmp_normalized_distance_offset: float = 1 + tmp_not_normalized_distance_offset
-        elif tmp_not_normalized_distance_offset >= -50:
-            tmp_normalized_distance_offset: float = (1 + tmp_not_normalized_distance_offset) / 49
+        elif par_car_state_not_normalized.distance_offset_center >= -1:
+            tmp_normalized_distance_offset: float = \
+                1 + par_car_state_not_normalized.distance_offset_center
+        elif par_car_state_not_normalized.distance_offset_center >= -50:
+            tmp_normalized_distance_offset: float = \
+                (1 + par_car_state_not_normalized.distance_offset_center) / 49
         else:
             tmp_normalized_distance_offset: float = -1
 
-        tmp_not_normalized_lap_progress: float = par_state_inputs[2]
-        tmp_normalized_lap_progress: float = tmp_not_normalized_lap_progress / 100
+        tmp_normalized_lap_progress: float = par_car_state_not_normalized.lap_progress / 100
 
-        tmp_not_normalized_direction_offset: int = par_state_inputs[3]
-        tmp_normalized_direction_offset: int = tmp_not_normalized_direction_offset
+        tmp_normalized_direction_offset: float = par_car_state_not_normalized.incline_center
 
-        return (
-            round(tmp_normalized_speed, ndigits=6),
-            round(tmp_normalized_distance_offset, ndigits=6),
-            round(tmp_normalized_lap_progress, ndigits=5),
-            tmp_normalized_direction_offset
+        return CarState(
+            par_speed_mph=round(tmp_normalized_speed, ndigits=6),
+            par_distance_offset_center=round(tmp_normalized_distance_offset, ndigits=6),
+            par_lap_progress=round(tmp_normalized_lap_progress, ndigits=5),
+            par_incline_center=tmp_normalized_direction_offset
         )
 
     def reset(self):
@@ -145,8 +145,8 @@ class Env:
         Returns:
         A numpy array representing the initial state of the environment.
         """
-        print("Debug Call")
         self.controls.release_all_keys()
+        self.controls.reset_directional_controls()
         state, _, _ = self.make_state()
 
         tmp_queue_game_inputs: multiprocessing.Queue = \
@@ -157,9 +157,9 @@ class Env:
 
         self.controls.a_is_executing_critical_action = True
         self.a_game_inputs.game_restart_inputs.put(True)
-        print("Restart Initiated")
+        Printer.print_info("Restart Initiated", "ENV")
         while not self.a_game_inputs.game_restart_inputs.empty():
-            print("Waiting For Game To Restart")
+            Printer.print_info("Waiting For Game To Restart", "ENV")
             time.sleep(1)
         self.a_step_counter = 0
         self.controls.a_is_executing_critical_action = False
@@ -198,7 +198,8 @@ class Env:
         A tuple containing the next state, reward, done flag, and steps taken.
         """
         self.a_step_counter += 1
-        print("Step Internal Counter: " + str(self.a_step_counter))
+        Printer.print_basic("--------------------")
+        Printer.print_info("Step Internal Counter: " + str(self.a_step_counter), "ENV")
         terminal = False
         reward: float = 0
         self.take_action(action, 1 / self.a_game_speed)
@@ -206,7 +207,7 @@ class Env:
         # daj progress - +1% - prida reward
         # daj progress - -1% - da pokutu
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
-            print("Waiting for Game API to send data (Step)")
+            Printer.print_info("Waiting for Game API to send data (Step)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
 
@@ -217,11 +218,14 @@ class Env:
 
         tmp_lap_progress_diff: float = self.get_lap_progress_dif(tmp_lap_progress)
 
-        edited_state_tuple: tuple[float, float, float, float, float] = \
-            (tmp_speed, tmp_car_distance_offset, tmp_lap_progress, tmp_lap_progress_diff,
-             tmp_car_direction_offset)
+        edited_car_state: CarStateInEnvironment \
+            = CarStateInEnvironment(par_speed_mph=tmp_speed,
+                                    par_distance_offset_center=tmp_car_distance_offset,
+                                    par_lap_progress=tmp_lap_progress,
+                                    par_lap_progress_difference=tmp_lap_progress_diff,
+                                    par_incline_center=tmp_car_direction_offset)
 
-        new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_state_tuple,
+        new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_car_state,
                                                                       self.game_steps_per_episode,
                                                                       self.a_step_counter,
                                                                       terminal)
@@ -229,40 +233,43 @@ class Env:
 
         self.update_lap_curr(tmp_lap_progress)
 
-        tmp_normalized_inputs: tuple[float, float, float, int] = self.normalize_state_values(
-            (tmp_speed, tmp_car_distance_offset, tmp_lap_progress, int(tmp_car_direction_offset))
-        )
+        tmp_normalized_car_state: CarState = \
+            self.normalize_state_values(CarState(par_speed_mph=tmp_speed,
+                                                 par_distance_offset_center=tmp_car_distance_offset,
+                                                 par_lap_progress=tmp_lap_progress,
+                                                 par_incline_center=tmp_car_direction_offset))
 
-        new_state_input: tuple[int, float, float, float, int] = (
-            action, tmp_normalized_inputs[0], tmp_normalized_inputs[1], tmp_normalized_inputs[2],
-            tmp_normalized_inputs[3])
-        new_state = self.calculate_state(new_state_input)
+        new_state = self.calculate_state(
+            par_action_taken=action,
+            par_current_car_state=tmp_normalized_car_state
+        )
 
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
         #                          tmp_lap_progress, tmp_car_direction_offset])
 
         return new_state, reward, terminal, self.a_step_counter
 
-    def calculate_state(self, par_current_inputs:
-    tuple[int, float, float, float, int]) -> torch.tensor:
+    def calculate_state(self, par_action_taken: int,
+                        par_current_car_state: CarState) -> torch.tensor:
         """
         Shifts the rows of the state matrix down by one row and inserts the new input parameters
         in the first row. Prints the updated matrix.
 
         Args:
-            par_current_inputs: A tuple of 5 float values representing the current
-                input parameters: 
-                    [ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER]
+            par_action_taken: The current action by the car from th environment [ACTION_TAKEN]
+            par_current_car_state: A object of CarState class representing the current
+                car state: 
+                    [CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER]
 
         Returns:
             Torch Tensor representing state as a tensor
         """
-        current_inputs_rounded: tuple[int, float, float, float, int] = (
-            par_current_inputs[0],
-            round(par_current_inputs[1], ndigits=6),
-            round(par_current_inputs[2], ndigits=6),
-            round(par_current_inputs[3], ndigits=5),
-            par_current_inputs[4]
+        current_inputs_rounded: tuple[int, float, float, float, float] = (
+            par_action_taken,
+            round(par_current_car_state.speed_mph, ndigits=6),
+            round(par_current_car_state.distance_offset_center, ndigits=6),
+            round(par_current_car_state.lap_progress, ndigits=5),
+            par_current_car_state.incline_center
         )
 
         # shift the rows down

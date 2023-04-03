@@ -56,7 +56,7 @@ class CheatEngine:
 
         items = list_apps.texts()
 
-        game_name: str  = par_process_name
+        game_name: str = par_process_name
 
         index = 0
         index_found = -1

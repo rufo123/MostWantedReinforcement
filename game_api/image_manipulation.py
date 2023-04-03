@@ -80,7 +80,6 @@ class ImageManipulation:
         res = cv2.matchTemplate(screen_gray, restart_state_gray, cv2.TM_CCOEFF_NORMED)
         threshold = 0.8
         loc = np.where(res >= threshold)
-        print(loc)
 
         # Return boolean based on whether match was found or not
         return len(loc[0]) > 0
