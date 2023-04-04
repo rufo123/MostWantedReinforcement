@@ -84,3 +84,6 @@ class ThirdExperimentBiggerStateNormalized(IConfiguration):
             par_enabled_car_speed=True,
             par_enabled_lap_progress=True,
         )
+
+    def return_name(self) -> str:
+        return "experiment_third_bigger_state_normalized"

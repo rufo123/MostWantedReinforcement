@@ -82,3 +82,6 @@ class FifthExperimentRemovedProgressReward(IConfiguration):
             par_enabled_car_speed=True,
             par_enabled_lap_progress=True,
         )
+
+    def return_name(self) -> str:
+        return "experiment_partial_terminal_lap_smaller_reward"

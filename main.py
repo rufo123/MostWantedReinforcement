@@ -20,13 +20,13 @@ from models.short_race import PolicyValueModel
 from utils.print_utils.printer import Printer
 from utils.stats import write_to_file
 
-a_global_settings: dict[str, Union[str, Callable[[], str]]] = {
-    'name': 'experiment_mini_map',
-    'path': lambda: f'h:/diplomka_vysledky/results/short_race/{a_global_settings["name"]}/'
-}
-
 a_configuration: dict[str, ConfigurationEnum] = {
     'config-experiment': ConfigurationEnum.SIXTH_EXPERIMENT
+}
+
+a_global_settings: dict[str, Union[str, Callable[[], str]]] = {
+    'name': a_configuration['config-experiment'].return_configuration().return_name(),
+    'path': lambda: f'h:/diplomka_vysledky/results/short_race/{a_global_settings["name"]}/'
 }
 
 

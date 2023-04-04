@@ -50,3 +50,12 @@ class IConfiguration(ABC):
         Returns:
             EnabledGameApiValues: An instance of EnabledGameApiValues.
         """
+
+    @abstractmethod
+    def return_name(self) -> str:
+        """
+          Return a name of the experiment (used mainly for folder naming).
+    
+          Returns:
+              str: a name of the experiment.
+          """

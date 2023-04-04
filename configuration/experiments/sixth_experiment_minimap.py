@@ -88,3 +88,6 @@ class SixthExperimentMinimap(IConfiguration):
             par_enabled_lap_progress=True,
             par_enabled_wrong_way_indicator=True
         )
+
+    def return_name(self) -> str:
+        return "experiment_mini_map"
