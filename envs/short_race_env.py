@@ -5,14 +5,14 @@ import multiprocessing
 import time
 
 import numpy as np
-import torch
 from absl import flags
 
 from action_translator_enum import ActionTranslatorEnum
 from car_states.car_state import CarState
 from car_states.car_state_in_environment import CarStateInEnvironment
-from envs.strategy.a_reward_strategy import ARewardStrategy
-from envs.strategy.reward_strategy_enum import RewardStrategyEnum
+from car_states.enabled_game_api_values import EnabledGameApiValues
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
+from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStrategy
 from game_inputs import GameInputs
 from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
@@ -35,6 +35,8 @@ class Env:
     a_game_inputs: GameInputs
     a_step_counter: int
     a_reward_strategy: ARewardStrategy
+    a_state_calculation_strategy: AStateCalculationStrategy
+    a_enabled_game_api_values: EnabledGameApiValues
     a_state_matrix: np.ndarray
 
     default_settings = {
@@ -42,10 +44,13 @@ class Env:
         'game_steps_per_episode': 150,
         'visualize': True,
         'realtime': False,
-        'reward_strategy': RewardStrategyEnum.SECOND_REWARD_STRATEGY
     }
 
-    def __init__(self, par_game_inputs: GameInputs):
+    def __init__(self, par_game_inputs: GameInputs,
+                 par_reward_strategy: ARewardStrategy,
+                 par_state_calc_strategy: AStateCalculationStrategy,
+                 par_enabled_game_api_values: EnabledGameApiValues
+                 ):
         """
         Initializes an instance of the Env class.
 
@@ -58,7 +63,9 @@ class Env:
         self.action_counter = 0
         self.controls = Controls()
         self.game_steps_per_episode: int = self.default_settings['game_steps_per_episode']
-        self.a_reward_strategy = self.default_settings['reward_strategy'].return_strategy()
+        self.a_reward_strategy = par_reward_strategy
+        self.a_state_calculation_strategy = par_state_calc_strategy
+        self.a_enabled_game_api_values = par_enabled_game_api_values
 
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
@@ -80,63 +87,16 @@ class Env:
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
             Printer.print_info("Waiting for Game API to send data (Make_State)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
-        tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
+        tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
 
-        tmp_car_state_from_game: CarState = CarState(
-            par_speed_mph=tmp_tuple_with_values[0],
-            par_distance_offset_center=tmp_tuple_with_values[1],
-            par_lap_progress=tmp_tuple_with_values[2],
-            par_incline_center=tmp_tuple_with_values[3]
-        )
-
-        tmp_normalized_car_state_from_game = self.normalize_state_values(tmp_car_state_from_game)
-
-        state = self.calculate_state(
+        state = self.a_state_calculation_strategy.calculate_state(
             par_action_taken=-1,
-            par_current_car_state=tmp_normalized_car_state_from_game)
+            par_car_state=tmp_car_state_from_game
+        )
 
         state = state.numpy()
 
         return state, tmp_reward, terminal
-
-    def normalize_state_values(self, par_car_state_not_normalized: CarState) -> CarState:
-        """
-        Normalizes the input state values and returns a tuple of normalized values.
-
-        Args:
-            par_car_state_not_normalized (CarState): A CarState object of unnormalized state
-                values, including the car speed, distance offset, lap progress, and direction
-                offset.
-
-        Returns:
-            CarState: A CarState object of normalized state values, including the
-                normalized car speed, normalized distance offset, normalized lap progress,
-                and normalized direction offset.
-        """
-        tmp_car_top_speed: float = 111
-        tmp_normalized_speed = par_car_state_not_normalized.speed_mph / tmp_car_top_speed
-
-        if par_car_state_not_normalized.distance_offset_center >= 0:
-            tmp_normalized_distance_offset: float = 1
-        elif par_car_state_not_normalized.distance_offset_center >= -1:
-            tmp_normalized_distance_offset: float = \
-                1 + par_car_state_not_normalized.distance_offset_center
-        elif par_car_state_not_normalized.distance_offset_center >= -50:
-            tmp_normalized_distance_offset: float = \
-                (1 + par_car_state_not_normalized.distance_offset_center) / 49
-        else:
-            tmp_normalized_distance_offset: float = -1
-
-        tmp_normalized_lap_progress: float = par_car_state_not_normalized.lap_progress / 100
-
-        tmp_normalized_direction_offset: float = par_car_state_not_normalized.incline_center
-
-        return CarState(
-            par_speed_mph=round(tmp_normalized_speed, ndigits=6),
-            par_distance_offset_center=round(tmp_normalized_distance_offset, ndigits=6),
-            par_lap_progress=round(tmp_normalized_lap_progress, ndigits=5),
-            par_incline_center=tmp_normalized_direction_offset
-        )
 
     def reset(self):
         """
@@ -209,21 +169,14 @@ class Env:
         while self.a_game_inputs.agent_inputs_state.qsize() == 0:
             Printer.print_info("Waiting for Game API to send data (Step)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
-        tmp_tuple_with_values: tuple = self.a_game_inputs.agent_inputs_state.get()
+        tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
 
-        tmp_speed: float = tmp_tuple_with_values[0]
-        tmp_car_distance_offset: float = tmp_tuple_with_values[1]
-        tmp_lap_progress: float = tmp_tuple_with_values[2]
-        tmp_car_direction_offset: float = tmp_tuple_with_values[3]
-
-        tmp_lap_progress_diff: float = self.get_lap_progress_dif(tmp_lap_progress)
+        tmp_lap_progress_diff: float = \
+            self.get_lap_progress_dif(tmp_car_state_from_game.lap_progress)
 
         edited_car_state: CarStateInEnvironment \
-            = CarStateInEnvironment(par_speed_mph=tmp_speed,
-                                    par_distance_offset_center=tmp_car_distance_offset,
-                                    par_lap_progress=tmp_lap_progress,
-                                    par_lap_progress_difference=tmp_lap_progress_diff,
-                                    par_incline_center=tmp_car_direction_offset)
+            = CarStateInEnvironment(par_lap_progress_difference=tmp_lap_progress_diff,
+                                    par_car_state=tmp_car_state_from_game)
 
         new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_car_state,
                                                                       self.game_steps_per_episode,
@@ -231,56 +184,17 @@ class Env:
                                                                       terminal)
         reward += new_reward
 
-        self.update_lap_curr(tmp_lap_progress)
+        self.update_lap_curr(tmp_car_state_from_game.lap_progress)
 
-        tmp_normalized_car_state: CarState = \
-            self.normalize_state_values(CarState(par_speed_mph=tmp_speed,
-                                                 par_distance_offset_center=tmp_car_distance_offset,
-                                                 par_lap_progress=tmp_lap_progress,
-                                                 par_incline_center=tmp_car_direction_offset))
-
-        new_state = self.calculate_state(
+        new_state = self.a_state_calculation_strategy.calculate_state(
             par_action_taken=action,
-            par_current_car_state=tmp_normalized_car_state
+            par_car_state=edited_car_state
         )
 
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,
         #                          tmp_lap_progress, tmp_car_direction_offset])
 
         return new_state, reward, terminal, self.a_step_counter
-
-    def calculate_state(self, par_action_taken: int,
-                        par_current_car_state: CarState) -> torch.tensor:
-        """
-        Shifts the rows of the state matrix down by one row and inserts the new input parameters
-        in the first row. Prints the updated matrix.
-
-        Args:
-            par_action_taken: The current action by the car from th environment [ACTION_TAKEN]
-            par_current_car_state: A object of CarState class representing the current
-                car state: 
-                    [CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER]
-
-        Returns:
-            Torch Tensor representing state as a tensor
-        """
-        current_inputs_rounded: tuple[int, float, float, float, float] = (
-            par_action_taken,
-            round(par_current_car_state.speed_mph, ndigits=6),
-            round(par_current_car_state.distance_offset_center, ndigits=6),
-            round(par_current_car_state.lap_progress, ndigits=5),
-            par_current_car_state.incline_center
-        )
-
-        # shift the rows down
-        self.a_state_matrix[1:, :] = self.a_state_matrix[:-1, :]
-        # insert the new parameters in the first row
-        self.a_state_matrix[0, :] = current_inputs_rounded
-        # print the updated matrix
-        # print("ACTION, CAR_SPEED, DISTANCE_FROM_CENTER, LAP_PROGRESS, INCLINE_FROM_CENTER")
-        # print(self.a_state_matrix)
-
-        return torch.tensor(self.a_state_matrix.flatten()).view(1, 1, 25)
 
     def take_action(self, par_action: int, par_sleep_time: float = 1) -> int:
         """
@@ -315,11 +229,22 @@ class Env:
         super().close()  # pylint: disable=no-member
 
 
-def create_env(par_game_inputs: GameInputs) -> Env:
+def create_env(par_game_inputs: GameInputs,
+               par_reward_strategy: ARewardStrategy,
+               par_state_calc_strategy: AStateCalculationStrategy,
+               par_enabled_game_api_values: EnabledGameApiValues) -> Env:
     """
     Creates a game environment for playing the game.
 
     :param par_game_inputs: The game inputs for the environment.
+    :param par_reward_strategy: The reward strategy.
+    :param par_state_calc_strategy: The state calculation strategy.
+    :param par_enabled_game_api_values: The enabled game api values.
     :return: An instance of the game environment.
     """
-    return Env(par_game_inputs)
+    return Env(
+        par_game_inputs,
+        par_reward_strategy,
+        par_state_calc_strategy,
+        par_enabled_game_api_values
+    )

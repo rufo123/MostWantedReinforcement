@@ -10,7 +10,7 @@ import time
 # Disable the pylint error for the next line
 # pylint: disable=no-name-in-module
 from queue import Empty
-from typing import Tuple
+from typing import Tuple, Optional
 
 import cv2
 import keyboard
@@ -24,6 +24,8 @@ from PIL import Image
 from cv2 import cuda
 from numpy import ndarray
 
+from car_states.car_state import CarState
+from car_states.enabled_game_api_values import EnabledGameApiValues
 from game_api.cheat_engine import CheatEngine
 from game_api.font_settings import FontSettings
 from game_api.image_manipulation import ImageManipulation
@@ -117,6 +119,8 @@ class Game:
 
     a_dictionary_menus: dict[str, str]
 
+    a_enabled_game_api_values: EnabledGameApiValues
+
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
         self.a_image_manipulation.load_comparable_images()
@@ -155,6 +159,9 @@ class Game:
             GpsImageRecognitionStrategyCPU()
             self.a_gps_strategy_enum = GPSStrategyEnum.CPU
 
+        self.a_gps_img_rcg_strategy = GpsImageRecognitionStrategyCPU()
+        self.a_gps_strategy_enum = GPSStrategyEnum.CPU
+
         self.a_gps = GPS(self.a_gps_strategy_enum)
 
     def init_game_memory_objects(self) -> None:
@@ -167,7 +174,8 @@ class Game:
         self.a_revolutions_per_minute.construct()
         self.a_wrong_way.construct()
 
-    def initialize_game(self, par_game_inputs: GameInputs) -> None:
+    def initialize_game(self, par_game_inputs: GameInputs,
+                        par_enabled_game_api_values: EnabledGameApiValues) -> None:
         """
         Initializes the game by starting the game, waiting for it to start, creating and 
             initializing required game objects,and setting the game speed and cheat engine.
@@ -175,11 +183,14 @@ class Game:
         Args:
             par_game_inputs (GameInputs): an instance of GameInputs class containing the 
                 game inputs.
+            par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
+                class containing the enabled game api values. 
 
         Returns:
             None
         """
         self.a_game_state = GameStateStarting()
+        self.a_enabled_game_api_values = par_enabled_game_api_values
         self.start_game()
         # self.start_cheat_engine()
 
@@ -229,7 +240,12 @@ class Game:
             self.a_speed
         ))
 
-    def main_loop(self, par_game_inputs: GameInputs, par_results_path: str):
+    #pylint: disable=too-many-locals
+    #pylint: disable=too-many-branches
+    #pylint: disable=too-many-statements
+    def main_loop(self, par_game_inputs: GameInputs,
+                  par_results_path: str,
+                  par_enabled_game_api_values: EnabledGameApiValues):
         """
         Main Loop That Controls All The Game Logic
 
@@ -237,12 +253,14 @@ class Game:
             par_game_inputs (GameInputs): An instance of the GameInputs class containing the
                 inputs for the game.
             par_results_path (str): Path of the folder containing results including graph images
+            par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
+                class containing the enabled game api values. 
 
         Returns:
             None: This method doesn't return anything.
         """
 
-        self.initialize_game(par_game_inputs)
+        self.initialize_game(par_game_inputs, par_enabled_game_api_values)
 
         tmp_start_time = time.time()
         tmp_speed_constant = 1 / self.a_speed
@@ -263,28 +281,47 @@ class Game:
                 self.a_is_recording = True
                 self.a_list_bitmap = []
 
-            tmp_speed_mph: int = self.a_speedometer.return_speed_mph()
-            tmp_lap_progress: float = self.a_lap_progress.return_lap_completed_percent()
+            grayscale_image, gps_mask, gps_center, gps_size = \
+                self.a_gps_img_rcg_strategy.gps_data_with_greyscale(self.a_gps, self.a_screenshot)
 
-            # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
-            tmp_car_offset_distance: float
-            tmp_contour: list
-            tmp_car_offset_direction: int
-            tmp_car_offset_distance, tmp_contour, tmp_car_offset_direction = \
-                self.a_gps_img_rcg_strategy.calc_car_offset(self.a_gps, self.a_screenshot)
+            tmp_speed_mph: int = -1
+            if par_enabled_game_api_values.enabled_car_speed_mph:
+                tmp_speed_mph = self.a_speedometer.return_speed_mph()
+            tmp_lap_progress: float = -1
+            if par_enabled_game_api_values.enabled_lap_progress:
+                tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
+            tmp_wrong_way_indicator: int = -1
+            if par_enabled_game_api_values.enabled_wrong_way_indicator:
+                tmp_wrong_way_indicator = self.a_wrong_way.return_is_wrong_way()
+            tmp_revolutions_per_minute: float = -1
+            if par_enabled_game_api_values.enabled_revolutions_per_minute:
+                tmp_revolutions_per_minute = \
+                    self.a_revolutions_per_minute.return_revolutions_per_minute()
+            tmp_gps_cropped_greyscale: Optional[ndarray] = None
+            if par_enabled_game_api_values.enabled_mini_map:
+                tmp_gps_cropped_greyscale = \
+                    self.a_gps_img_rcg_strategy.get_half_gps_greyscale(self.a_screenshot,
+                                                                       grayscale_image,
+                                                                       gps_mask, gps_center,
+                                                                       gps_size)
+            tmp_car_offset_distance: float = -1
+            tmp_car_offset_direction: int = -1
+            tmp_contour: Optional[list] = None
+            if par_enabled_game_api_values.enabled_distance_incline_center or \
+                    par_enabled_game_api_values.enabled_distance_offset_center:
+                tmp_car_offset_distance, tmp_contour, tmp_car_offset_direction = \
+                    self.a_gps_img_rcg_strategy.calc_car_offset(
+                        par_gps=self.a_gps,
+                        par_image=self.a_screenshot,
+                        par_gps_mask=gps_mask,
+                        par_gps_center=gps_center
+                    )
 
             self.a_car_distance_offset = tmp_car_offset_distance
             self.a_car_direction_offset = tmp_car_offset_direction
 
             if tmp_contour is not None:
                 cv2.drawContours(self.a_screenshot, [tmp_contour], -1, (255, 0, 255), -1)
-
-            strings_to_show: ndarray = np.array([
-                str(tmp_speed_mph),
-                str(round(tmp_car_offset_distance, 2)),
-                str(round(tmp_lap_progress, 2)),
-                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
-            ])
 
             backup_screenshot: ndarray = self.a_screenshot
             self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
@@ -318,15 +355,22 @@ class Game:
                     par_game_inputs.agent_inputs_state.get_nowait()
                 except Empty:
                     pass  # This case is possible qsize() is unreliable, it is expected behaviour
-            par_game_inputs.agent_inputs_state.put(
-                (self.get_speed_mph(), self.get_car_distance_offset(),
-                 self.a_lap_progress.return_lap_completed_percent(),
-                 self.a_car_direction_offset, self.get_revolutions_per_minute(),
-                 self.get_is_wrong_way()))
+
+            car_state = CarState(
+                par_speed_mph=tmp_speed_mph,
+                par_distance_offset_center=self.get_car_distance_offset(),
+                par_incline_center=self.get_car_direction_offset(),
+                par_lap_progress=tmp_lap_progress,
+                par_wrong_way_indicator=tmp_wrong_way_indicator,
+                par_revolutions_per_minute=tmp_revolutions_per_minute,
+                par_mini_map=tmp_gps_cropped_greyscale
+            )
+
+            par_game_inputs.agent_inputs_state.put(car_state, )
 
             self.show_texts_on_image(par_image=backup_screenshot,
                                      par_font_color=(159, 43, 104),
-                                     par_array_of_text=strings_to_show
+                                     par_car_state=car_state
                                      )
 
             self.show_state_on_image(par_image=backup_screenshot,
@@ -476,7 +520,7 @@ class Game:
 
     def show_texts_on_image(self, par_image: ndarray,
                             par_font_color: tuple[int, int, int],
-                            par_array_of_text: np.ndarray
+                            par_car_state: CarState,
                             ) -> None:
         """
         Displays multiple texts on an image with specified font, font size, color, thickness, 
@@ -485,7 +529,7 @@ class Game:
         Args:
             par_image: An ndarray representing the input image.
             par_font_color: The color of the font in RGB format.
-            par_array_of_text: A numpy ndarray containing the text to be displayed.
+            par_car_state: A car state with values to display.
 
         Returns:
             None
@@ -493,17 +537,31 @@ class Game:
 
         tmp_new_font_scale: float = self.a_font_settings.font_scale
 
-        if par_array_of_text.size > 5:
-            tmp_new_font_scale -= 0.2 * (par_array_of_text.size - 5)
+        tmp_count_of_values_to_display: int = self.a_enabled_game_api_values.count_enabled_values
+        if self.a_enabled_game_api_values.enabled_mini_map:
+            tmp_count_of_values_to_display -= 1
+
+        if tmp_count_of_values_to_display > 5:
+            tmp_new_font_scale -= 0.2 * (tmp_count_of_values_to_display - 5)
 
         x_bottom_left_text_coordinate: int = 10
 
-        texts_to_show: list[str] = [
-            "Speed: " + par_array_of_text[0] + " MPH",
-            "Road Offset: " + par_array_of_text[1] + "",
-            "Completed: " + par_array_of_text[2] + "%",
-            "Incline: " + par_array_of_text[3] + ""
-        ]
+        texts_to_show: list[str] = []
+
+        if self.a_enabled_game_api_values.enabled_car_speed_mph:
+            texts_to_show.append("Speed: " + str(par_car_state.speed_mph) + " MPH")
+        if self.a_enabled_game_api_values.enabled_distance_offset_center:
+            texts_to_show.append(
+                "Road Offset: " + str(round(par_car_state.distance_offset_center, 2)) + ""
+            )
+        if self.a_enabled_game_api_values.enabled_lap_progress:
+            texts_to_show.append("Completed: " + str(round(par_car_state.lap_progress, 2)) + "%")
+        if self.a_enabled_game_api_values.enabled_distance_incline_center:
+            texts_to_show.append("Incline: " + str(par_car_state.incline_center) + "")
+        if self.a_enabled_game_api_values.enabled_wrong_way_indicator:
+            texts_to_show.append("Wrong way: " + str(par_car_state.wrong_way_indicator) + "")
+        if self.a_enabled_game_api_values.enabled_revolutions_per_minute:
+            texts_to_show.append("RPM: " + str(par_car_state.revolutions_per_minute) + "")
 
         text_size, _ = \
             cv2.getTextSize(
@@ -802,6 +860,7 @@ class Game:
 
         # If the prompt with Attention (Do you Really Want to Restart) appears press Enter
         time.sleep(par_sleep_time_delay)
+
         self.a_controls.press_and_release_key(self.a_controls.ENTER, par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 

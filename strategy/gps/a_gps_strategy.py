@@ -20,7 +20,7 @@ class AGPSStrategy(ABC):
     """
 
     @abstractmethod
-    def get_gps_mask(self, par_greyscale):
+    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Abstract method that returns a GPS mask given a greyscale image.
 
@@ -81,7 +81,7 @@ class AGPSStrategy(ABC):
             return contours[tmp_closest_contour_index]
         return None
 
-    def _get_gps_mask_core(self, par_greyscale) -> tuple[ndarray, tuple[int, int]]:
+    def _get_gps_mask_core(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Private method - Compute the GPS mask for the given grayscale image.
 
@@ -113,7 +113,7 @@ class AGPSStrategy(ABC):
         # Draw the ellipse on the GPS mask using numpy
         gps = np.zeros_like(par_greyscale)
         gps = cv2.ellipse(gps, gps_center, gps_size, 0, 180, 360, color=255, thickness=-1)
-        return gps, gps_center
+        return gps, gps_center, gps_size
 
     def __scale_contour(self, par_cnt, par_scale):
         """

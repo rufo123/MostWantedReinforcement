@@ -9,12 +9,13 @@ Classes:
 
 """
 from car_states.car_state_in_environment import CarStateInEnvironment
-from envs.strategy.a_reward_strategy import ARewardStrategy
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
 from utils.print_utils.printer import Printer
 
 
 # pylint: disable=too-few-public-methods
-class SecondRewardStrategy(ARewardStrategy):
+# pylint: disable=R0801
+class ThirdRewardStrategy(ARewardStrategy):
     """
     This class is an implementation of the ARewardStrategy abstract class.
     This implementation gives:
@@ -68,16 +69,16 @@ class SecondRewardStrategy(ARewardStrategy):
 
         reward += self.__distance_offset_reward(par_env_inputs.distance_offset_center,
                                                 tmp_normalization_value)
-        
+
         if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
-                Printer.print_info("Exceeded Step Limit", "SECOND REWARD_STRATEGY",)
+                Printer.print_info("Exceeded Step Limit", "THIRD_REWARD_STRATEGY", )
                 reward += ((par_env_inputs.lap_progress / 5) - 1)
             if par_env_inputs.lap_progress >= 10:
                 reward += 1
-                Printer.print_success("Lap Complete", "SECOND REWARD_STRATEGY")
-            Printer.print_info("TERMINAL STATE ACHIEVED", "SECOND REWARD_STRATEGY")
+                Printer.print_success("Lap Complete", "THIRD_REWARD_STRATEGY")
+            Printer.print_info("TERMINAL STATE ACHIEVED", "THIRD_REWARD_STRATEGY")
         return reward, terminal
 
     def __distance_offset_reward(self, par_car_distance_offset: float,

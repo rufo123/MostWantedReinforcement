@@ -9,26 +9,28 @@ Classes:
 
 """
 from car_states.car_state_in_environment import CarStateInEnvironment
-from envs.strategy.a_reward_strategy import ARewardStrategy
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
 from utils.print_utils.printer import Printer
 
 
 # pylint: disable=too-few-public-methods
-class FirstRewardStrategy(ARewardStrategy):
+# pylint: disable=R0801
+class FourthRewardStrategy(ARewardStrategy):
     """
     This class is an implementation of the ARewardStrategy abstract class.
     This implementation gives:
      - positive reward for:
         Offset (Distance From Road Centre): <0, 1> and <-1, 0>
-        
+
         Completing The Race (Partially - 10%)
-        
+
      - negative reward for:
         Offset (Distance From Road Centre): (-10, -1> and (-inf, -10> 
-        
+
         Not Completing The Race in specified count_of_steps
     """
 
+    # noinspection DuplicatedCode
     def evaluate_reward(self, par_env_inputs: CarStateInEnvironment,
                         par_game_steps_per_episode: int,
                         par_env_steps_counter: int,
@@ -68,65 +70,16 @@ class FirstRewardStrategy(ARewardStrategy):
         reward += self.__lap_progress_reward(par_env_inputs.lap_progress_difference,
                                              tmp_normalization_value)
 
-        reward += self.__distance_offset_reward(par_env_inputs.distance_offset_center,
-                                                tmp_normalization_value)
-
         if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
-                Printer.print_info("Exceeded Step Limit", "REWARD_STRATEGY",)
+                Printer.print_info("Exceeded Step Limit", "FOURTH_REWARD_STRATEGY", )
                 reward += ((par_env_inputs.lap_progress / 5) - 1)
             if par_env_inputs.lap_progress >= 10:
                 reward += 1
-                Printer.print_success("Lap Complete", "REWARD_STRATEGY")
-                print()
-            Printer.print_info("TERMINAL STATE ACHIEVED", "REWARD_STRATEGY")
+                Printer.print_success("Lap Complete", "FOURTH_REWARD_STRATEGY")
+            Printer.print_info("TERMINAL STATE ACHIEVED", "FOURTH_REWARD_STRATEGY")
         return reward, terminal
-
-    def __distance_offset_reward(self, par_car_distance_offset: float,
-                                 par_normalization_value: int) -> float:
-        """
-        Computes the offset reward based on the car's distance offset from the target.
-
-        Args:
-            par_car_distance_offset (float): The car's distance offset from the target.
-                Negative values mean the car is behind the target, positive values mean
-                the car is ahead of the target.
-            par_normalization_value (int): A normalization value used to scale the reward.
-
-        Returns:
-            float: The computed offset reward.
-
-        The offset reward is computed as follows:
-        - If the car's distance offset is between -1 and -10, a negative reward is given
-          proportional to the offset's normalized value divided by the normalization value.
-          The normalized offset is obtained by dividing the offset minus -1 by 9.
-        - If the car's distance offset is lower than -10, a negative reward of -1 divided by
-          the normalization value is given.
-        - If the car's distance offset is between 0 and 1, a positive reward is given
-          proportional to 1 divided by the normalization value.
-        - If the car's distance offset is between -1 and 0, a positive reward is given
-          proportional to (1 + offset) divided by the normalization value.
-        """
-        # Offset Reward
-
-        offset_reward: float = 0
-
-        if -1 > par_car_distance_offset >= -10:
-            # Negative Reward - Offset Between - ( -10, -1 >
-            tmp_normalized_offset_div_10: float = (par_car_distance_offset - (-1)) / 9
-            offset_reward = tmp_normalized_offset_div_10 / par_normalization_value
-        elif par_car_distance_offset < -10:
-            # Negative Reward - Offset Greater Than 10 or Lower Than -10
-            offset_reward = -1 / par_normalization_value
-        elif par_car_distance_offset > 0:
-            # Positive Reward - Offset <0, 1>
-            offset_reward = 1 / par_normalization_value
-        elif -1 <= par_car_distance_offset <= 0:
-            # Positive Reward - Offset (-1, 0)
-            offset_reward = (1 + par_car_distance_offset) / par_normalization_value
-
-        return offset_reward
 
     def __lap_progress_reward(self, par_lap_progress_diff: float,
                               par_normalization_value: int) -> float:
@@ -148,5 +101,5 @@ class FirstRewardStrategy(ARewardStrategy):
             to the magnitude of the lap progress difference, divided by the
             normalization value.
         """
-        Printer.print_basic("Progress: " + str(par_lap_progress_diff), "FIRST_REWARD_STRATEGY")
+        Printer.print_basic("Progress: " + str(par_lap_progress_diff), "FOURTH_REWARD_STRATEGY")
         return par_lap_progress_diff / par_normalization_value

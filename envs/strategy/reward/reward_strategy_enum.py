@@ -5,9 +5,11 @@ This module provides an enumeration of reward strategies and a function to retur
 """
 from enum import Enum
 
-from envs.strategy.a_reward_strategy import ARewardStrategy
-from envs.strategy.first_reward_strategy import FirstRewardStrategy
-from envs.strategy.second_reward_strategy import SecondRewardStrategy
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
+from envs.strategy.reward.first_reward_strategy import FirstRewardStrategy
+from envs.strategy.reward.fourth_reward_strategy import FourthRewardStrategy
+from envs.strategy.reward.second_reward_strategy import SecondRewardStrategy
+from envs.strategy.reward.third_reward_strategy import ThirdRewardStrategy
 
 
 class RewardStrategyEnum(Enum):
@@ -16,6 +18,8 @@ class RewardStrategyEnum(Enum):
     """
     FIRST_REWARD_STRATEGY = 0
     SECOND_REWARD_STRATEGY = 1
+    THIRD_REWARD_STRATEGY = 2
+    FOURTH_REWARD_STRATEGY = 3
 
     def return_strategy(self) -> ARewardStrategy:
         """
@@ -34,7 +38,9 @@ class RewardStrategyEnum(Enum):
         # but withing Enum class it is not possible to do.
         strategy_dict: dict[RewardStrategyEnum, ARewardStrategy] = {
             self.FIRST_REWARD_STRATEGY: FirstRewardStrategy(),
-            self.SECOND_REWARD_STRATEGY: SecondRewardStrategy()
+            self.SECOND_REWARD_STRATEGY: SecondRewardStrategy(),
+            self.THIRD_REWARD_STRATEGY: ThirdRewardStrategy(),
+            self.FOURTH_REWARD_STRATEGY: FourthRewardStrategy()
         }
 
         try:

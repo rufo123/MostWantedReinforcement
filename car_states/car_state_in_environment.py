@@ -27,23 +27,38 @@ class CarStateInEnvironment(CarState):
         par_revolutions_per_minute (float): The car's revolutions per minute (RPM).
         par_wrong_way_indicator (float): Indicates whether the car is currently driving
             the wrong way around the track (1.0) or not (0.0).
+        par_mini_map (numpy.ndarray): A 3D array representing a top-down view of the track
+            and the car's position. Defaults to None.
+        par_car_state (CarState): An instance of the parent class `CarState` to copy values from.
+            Defaults to None.
     """
     _a_lap_progress_difference: float
 
     # pylint: disable=too-many-arguments
-    def __init__(self, par_lap_progress_difference: float,
+    def __init__(self, par_lap_progress_difference: float = -1,
                  par_speed_mph=-1, par_distance_offset_center=-1,
                  par_lap_progress=-1, par_incline_center=-1, par_revolutions_per_minute=-1,
-                 par_wrong_way_indicator=-1):
-        self._a_action = par_lap_progress_difference
-        super().__init__(par_speed_mph=par_speed_mph,
-                         par_distance_offset_center=par_distance_offset_center,
-                         par_lap_progress=par_lap_progress,
-                         par_incline_center=par_incline_center,
-                         par_revolutions_per_minute=par_revolutions_per_minute,
-                         par_wrong_way_indicator=par_wrong_way_indicator)
+                 par_wrong_way_indicator=-1, par_mini_map=None, par_car_state: CarState = None):
+        self._a_lap_progress_difference = par_lap_progress_difference
+
+        if par_car_state:
+            super().__init__(par_speed_mph=par_car_state.speed_mph,
+                             par_distance_offset_center=par_car_state.distance_offset_center,
+                             par_lap_progress=par_car_state.lap_progress,
+                             par_incline_center=par_car_state.incline_center,
+                             par_revolutions_per_minute=par_car_state.revolutions_per_minute,
+                             par_wrong_way_indicator=par_car_state.wrong_way_indicator,
+                             par_mini_map=par_car_state.mini_map)
+        else:
+            super().__init__(par_speed_mph=par_speed_mph,
+                             par_distance_offset_center=par_distance_offset_center,
+                             par_lap_progress=par_lap_progress,
+                             par_incline_center=par_incline_center,
+                             par_revolutions_per_minute=par_revolutions_per_minute,
+                             par_wrong_way_indicator=par_wrong_way_indicator,
+                             par_mini_map=par_mini_map)
 
     @property
     def lap_progress_difference(self) -> float:
         """The difference of car progress between previous and current step."""
-        return self._a_action
+        return self._a_lap_progress_difference

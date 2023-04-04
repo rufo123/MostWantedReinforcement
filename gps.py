@@ -62,7 +62,7 @@ class GPS:
         """
         return self.a_gps_strategy.make_gps_contour(par_gps_image, par_screenshot, par_gps_center)
 
-    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int]]:
+    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Generates a GPS mask based on a greyscale image.
 

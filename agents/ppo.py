@@ -8,6 +8,7 @@ algorithm.
 import pickle
 import warnings
 from datetime import datetime
+from typing import Union
 
 import numpy as np
 import torch
@@ -16,6 +17,8 @@ import torch.nn.functional as F
 from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
+from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStrategy
 from game_inputs import GameInputs
 from utils.print_utils.printer import Printer
 from utils.stats import MovingAverageScore, write_to_file, append_to_file
@@ -92,7 +95,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     Returns:
     None.
     """
-    envs = [env_func(env_param) for _ in range(count_of_envs)]
+    envs = [env_func(*env_param) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
     steps_taken_storage = np.zeros(count_of_steps)
@@ -210,10 +213,11 @@ class Agent:
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
-    def train(self, env_param: GameInputs, env_func, count_of_actions,
+    def train(self, env_param: tuple[GameInputs, ARewardStrategy, AStateCalculationStrategy],
+              env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
-              batch_size=512, input_dim=4):
+              batch_size=512, input_dim: Union[int, tuple] = 4):
         """
         Trains the agent using Proximal Policy Optimization with Generalized Advantage Estimation.
 
@@ -229,6 +233,13 @@ class Agent:
         :param batch_size: the size of the batches used to update the network
         :param input_dim: the dimensionality of the observation space
         """
+
+        input_dim_readjusted: tuple
+        if isinstance(input_dim, int):
+            input_dim_readjusted = (input_dim,)
+        else:
+            input_dim_readjusted = input_dim
+
         Printer.print_info("Training is starting", "AGENT")
 
         logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took,steps_took'
@@ -254,7 +265,7 @@ class Agent:
             process.start()
 
         mem_dim = (count_of_processes, count_of_steps, count_of_envs)
-        mem_observations = torch.zeros((mem_dim + (input_dim,)), device=self.device)
+        mem_observations = torch.zeros((mem_dim + input_dim_readjusted), device=self.device)
         mem_actions = torch.zeros((*mem_dim, 1), device=self.device, dtype=torch.long)
         mem_log_probs = torch.zeros((*mem_dim, 1), device=self.device)
         if self.support_to_value:
@@ -271,7 +282,7 @@ class Agent:
                 mem_observations[:, step] = observations
 
                 with torch.no_grad():
-                    logits, values = self.model(observations.view(-1, *(input_dim,)))
+                    logits, values = self.model(observations.view(-1, *input_dim_readjusted))
 
                 # If you selected actions in the main process, your iteration
                 # would last about 0.5 seconds longer (measured on 2 processes)
@@ -290,7 +301,7 @@ class Agent:
             observations = torch.stack(observations).to(self.device)
 
             with torch.no_grad():
-                _, values = self.model(observations.view(-1, *(input_dim,)))
+                _, values = self.model(observations.view(-1, *input_dim_readjusted))
 
             if self.support_to_value:
                 values = support_to_scalar(values, self.value_support_size).view(
@@ -331,7 +342,7 @@ class Agent:
                 with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
                     pickle.dump(score, loaded_score)
 
-            mem_observations = mem_observations.view(-1, *(input_dim,))
+            mem_observations = mem_observations.view(-1, *input_dim_readjusted)
             mem_actions = mem_actions.view(-1, 1)
             mem_log_probs = mem_log_probs.view(-1, 1)
 
@@ -378,7 +389,7 @@ class Agent:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                     self.optimizer.step()
 
-            mem_observations = mem_observations.view((mem_dim + (input_dim,)))
+            mem_observations = mem_observations.view((mem_dim + input_dim_readjusted))
             mem_actions = mem_actions.view((*mem_dim, 1))
             mem_log_probs = mem_log_probs.view((*mem_dim, 1))
             if self.support_to_value:

@@ -11,6 +11,8 @@ import torch
 
 import graph.make_graph
 from agents.ppo import Agent
+from configuration.configuration_enum import ConfigurationEnum
+from configuration.i_configuration import IConfiguration
 from envs.short_race_env import create_env
 from game_api.game import Game
 from game_inputs import GameInputs
@@ -18,10 +20,13 @@ from models.short_race import PolicyValueModel
 from utils.print_utils.printer import Printer
 from utils.stats import write_to_file
 
-
 a_global_settings: dict[str, Union[str, Callable[[], str]]] = {
-    'name': 'experiment_partial_terminal_lap_smaller_reward',
+    'name': 'experiment_mini_map',
     'path': lambda: f'h:/diplomka_vysledky/results/short_race/{a_global_settings["name"]}/'
+}
+
+a_configuration: dict[str, ConfigurationEnum] = {
+    'config-experiment': ConfigurationEnum.SIXTH_EXPERIMENT
 }
 
 
@@ -38,11 +43,15 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
     """
     tmp_game: Game = Game()
     results_path: str = a_global_settings['path']()
+    selected_configuration: IConfiguration = \
+        a_configuration['config-experiment'].return_configuration()
+
     try:
 
         tmp_game.main_loop(
             par_game_inputs=par_game_inputs,
-            par_results_path=results_path
+            par_results_path=results_path,
+            par_enabled_game_api_values=selected_configuration.return_enabled_game_api_values()
         )
     except Exception as exception:
         Printer.print_error("An error occurred in Game Api", "MAIN", exception)
@@ -65,14 +74,23 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 1410
+        'previous_model_iter_number': 660
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Printer.print_basic(torch.version.cuda, "MAIN")
     Printer.print_basic("device: " + str(device))
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-    env_param = par_game_inputs
+    selected_configuration: IConfiguration = \
+        a_configuration['config-experiment'].return_configuration()
+
+    env_param = (
+        par_game_inputs,
+        selected_configuration.return_reward_strategy(),
+        selected_configuration.return_state_calc_strategy(),
+        selected_configuration.return_enabled_game_api_values()
+    )
+
     count_of_iterations = 20000
     count_of_processes = 1
     count_of_envs = 1
@@ -99,17 +117,15 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
         os.mkdir(os.path.abspath(path))
         Printer.print_success("new directory has been created", "MAIN")
 
-    dim1 = 25
+    dim1 = (4, 48, 48)
     count_of_actions = 8
-    count_of_features = 8448
-
-    model = PolicyValueModel(count_of_actions, count_of_features)
+    model = PolicyValueModel(selected_configuration.return_model())
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=tmp_learning_rate)
 
     # Drawing Scatter Plot From Existing Data
     if settings.get('create_scatter_plot'):
-        graph.make_graph.scatter_plot_show(path_logs_score)
+        graph.make_graph.scatter_plot_show(path_logs_score, 'avg_score')
 
     agent = Agent(model, optimizer, coef_value=0.25,
                   value_support_size=value_support_size,
@@ -154,7 +170,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
                     batch_size=batch_size, input_dim=dim1)
     except Exception as exception:
         Printer.print_error("An exception occurred during training", "MAIN", exception)
-        raise
+        raise exception
     # except Exception as e:
     #     i = i - 1
     #     continue
@@ -167,9 +183,11 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
 
 if __name__ == '__main__':
-    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + '\\score_final_exp2.txt'), 'avg_score')
-    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + '\\score_final_exp2.txt'), 'steps_took')
-    #exit()
+    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    # '\\score_final_exp2.txt'), 'avg_score')
+    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    # '\\score_final_exp2.txt'), 'steps_took')
+    # exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

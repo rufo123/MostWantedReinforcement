@@ -23,7 +23,7 @@ class GPSStrategyCPU(AGPSStrategy):
     - make_gps_contour: Returns a list of contours representing the GPS mask.
     """
 
-    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int]]:
+    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Returns a tuple containing a NumPy array representing the GPS mask and a tuple of 
             integers representing the size of the GPS mask.

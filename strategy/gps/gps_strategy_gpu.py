@@ -12,7 +12,8 @@ class GPSStrategyGPU(AGPSStrategy):
     """
     A class representing a GPS strategy that uses GPU acceleration with OpenCV CUDA.
     """
-    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int]]:
+
+    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Returns a tuple containing the GPS mask image and its center.
 
@@ -22,9 +23,9 @@ class GPSStrategyGPU(AGPSStrategy):
         Returns:
         - A tuple containing the GPS mask image and its center.
         """
-        tmp_gps, tmp_gps_center = self._get_gps_mask_core(par_greyscale)
+        tmp_gps, tmp_gps_center, tmp_gps_size = self._get_gps_mask_core(par_greyscale)
         tmp_gps = cv2.cvtColor(tmp_gps, cv2.COLOR_GRAY2RGB)
-        return tmp_gps, tmp_gps_center
+        return tmp_gps, tmp_gps_center, tmp_gps_size
 
     def make_gps_contour(self, gps_image, screenshot_to_draw, gps_center) -> list:
         """

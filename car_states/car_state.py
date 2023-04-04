@@ -2,6 +2,7 @@
 The `car_states` module contains the `CarState` class which represents the state of a car
  in environment
 """
+import numpy
 
 
 class CarState:
@@ -22,13 +23,15 @@ class CarState:
 
     # pylint: disable=too-many-arguments
     def __init__(self, par_speed_mph=-1, par_distance_offset_center=-1, par_lap_progress=-1,
-                 par_incline_center=-1, par_revolutions_per_minute=-1, par_wrong_way_indicator=-1):
+                 par_incline_center=-1, par_revolutions_per_minute=-1, par_wrong_way_indicator=-1,
+                 par_mini_map: numpy.ndarray = None):
         self._speed_mph = par_speed_mph
         self._distance_offset_center = par_distance_offset_center
         self._lap_progress = par_lap_progress
         self._incline_center = par_incline_center
         self._revolutions_per_minute = par_revolutions_per_minute
         self._wrong_way_indicator = par_wrong_way_indicator
+        self._mini_map = par_mini_map
 
     @property
     def speed_mph(self) -> float:
@@ -59,3 +62,9 @@ class CarState:
     def wrong_way_indicator(self) -> float:
         """Whether the car is currently driving in the wrong direction."""
         return self._wrong_way_indicator
+
+    @property
+    def mini_map(self) -> numpy.ndarray:
+        """Mini-map which shows information about environment from bird's eye view, it is
+         a 2D matrix in greyscale."""
+        return self._mini_map
