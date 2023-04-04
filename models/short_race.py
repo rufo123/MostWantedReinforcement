@@ -9,7 +9,7 @@ from models.abstract_factory.a_short_race_factory import AShortRaceFactory
 from utils.init import init_orthogonal_head, init_orthogonal_features
 
 
-#pylint:disable=too-few-public-methods
+# pylint:disable=too-few-public-methods
 class PolicyValueModel(nn.Module):
     """
     Class for creating a reinforcement learning agent to play Need for Speed Most Wanted (2005).
