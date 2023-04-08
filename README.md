@@ -1,7 +1,11 @@
 # MostWantedReinforcement
 Implementing Reinforcement Learning in Need For Speed Most Wanted: 2005
 
+___
+
 To be able to run it you must first of all have installed all the dependencies.
+
+___
 
 Requirements:
   1. Need for Speed: Most Wanted (2005). As to my knowledge the game is no longer available to buy, so you must download it from somewhere e.g. (torrent)
