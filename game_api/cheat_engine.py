@@ -17,7 +17,7 @@ class CheatEngine:
         Initialize a new instance of the CheatEngine class.
         """
 
-    def start_cheat_engine(self) -> None:
+    def start_cheat_engine(self, par_process_name: str) -> None:
         """
             Starts the Cheat Engine 7.4 application and focuses on its window.
 
@@ -56,7 +56,7 @@ class CheatEngine:
 
         items = list_apps.texts()
 
-        game_name: str = 'Need for Speed\u2122 Most Wanted'
+        game_name: str = par_process_name
 
         index = 0
         index_found = -1

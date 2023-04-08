@@ -49,7 +49,7 @@ class MemoryReader:
         self.mem = Pymem("speed.exe")
         self.module = module_from_name(self.mem.process_handle, self.game_exec_name).lpBaseOfDll
 
-    def return_value_from_pointer_address(self) -> Union[int, float]:
+    def return_value_from_pointer_address(self) -> Union[int, float, bool]:
         """
         Returns the value read from a memory address that is calculated using the module's
             base address and offsets.
@@ -58,16 +58,15 @@ class MemoryReader:
         - The value read from the memory address. The type of the value is determined
              by the return_value_type field.
         """
-        self.lock.acquire()
-
         if self.return_value_type == ReturnValuesEnum.FLOAT:
             self.returned_value_from_pointer_address = self.mem.read_float(
                 self.get_pointer_address(self.module + self.module_base_address, self.offsets))
-        else:
+        elif self.return_value_type == ReturnValuesEnum.INT:
             self.returned_value_from_pointer_address = self.mem.read_int(
                 self.get_pointer_address(self.module + self.module_base_address, self.offsets))
-
-        self.lock.release()
+        else:
+            self.returned_value_from_pointer_address = self.mem.read_bool(
+                self.get_pointer_address(self.module + self.module_base_address, self.offsets))
         return self.returned_value_from_pointer_address
 
     def get_pointer_address(self, base: int, offsets: list[int]) -> int:

@@ -14,6 +14,8 @@ class ReturnValuesEnum(Enum):
     Attributes:
         INT (int): An enumerated value representing an integer.
         FLOAT (float): An enumerated value representing a float.
-    """
+        BOOL (bool): An enumerated value representing a bool.
+        """
     INT = 0
     FLOAT = 1
+    BOOL = 2

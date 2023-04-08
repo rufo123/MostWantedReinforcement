@@ -1,5 +1,6 @@
-# Disable the pylint error for the next line
-# pylint: disable=missing-module-docstring
+"""
+This module provides a Class Which Acts as an API with the game Need for Speed: Most Wanted (2005)
+"""
 import ctypes
 import os
 import pathlib
@@ -9,7 +10,7 @@ import time
 # Disable the pylint error for the next line
 # pylint: disable=no-name-in-module
 from queue import Empty
-from typing import Tuple
+from typing import Tuple, Optional
 
 import cv2
 import keyboard
@@ -19,21 +20,33 @@ import win32con
 import win32gui
 import win32ui
 from PIL import Image
+# noinspection PyProtectedMember
 from cv2 import cuda
 from numpy import ndarray
 
+from car_states.car_state import CarState
+from car_states.enabled_game_api_values import EnabledGameApiValues
 from game_api.cheat_engine import CheatEngine
+from game_api.font_settings import FontSettings
 from game_api.image_manipulation import ImageManipulation
 from game_inputs import GameInputs
-from gps import GPS
 from game_memory_reading.lap_progress import LapProgress
 from game_memory_reading.lap_time import LapTime
+from game_memory_reading.revolutions_per_minute import RevolutionsPerMinute
 from game_memory_reading.speedometer import Speedometer
+from game_memory_reading.wrong_way import WrongWay
+from gps import GPS
+from state.a_game_state import AGameState
+from state.game_state_not_connected import GameStateNotConnected
+from state.game_state_restarting import GameStateRestarting
+from state.game_state_starting import GameStateStarting
+from state.game_state_training import GameStateTraining
 from strategy.gps.gps_strategy_enum import GPSStrategyEnum
 from strategy.gps_image_recognition.a_gps_ircgn_strategy import AGpsImageRecognitionStrategy
 from strategy.gps_image_recognition.gps_ircgn_strategy_cpu import GpsImageRecognitionStrategyCPU
 from strategy.gps_image_recognition.gps_ircgn_strategy_gpu import GpsImageRecognitionStrategyGPU
 from utils.enums.restart_states_enum import RestartStateEnum
+from utils.print_utils.printer import Printer
 from utils.singleton.controls import Controls
 
 
@@ -43,6 +56,13 @@ class Game:
     """
     Class Which Acts as an API with the game Need for Speed: Most Wanted (2005)
     """
+    api_settings = {
+        'game_path': r'F:\Games Folder\Electronic Arts\Need for Speed Most '
+                     r'Wanted\speed.exe',
+        'cheat_engine_path': r'C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64.exe',
+        'game_process_name': 'Need for Speed\u2122 Most Wanted',
+        'game_title_name': 'Need for Speed\u2122 Most Wanted',
+    }
     a_threshold = 100
     a_ratio = 3
 
@@ -51,11 +71,9 @@ class Game:
     a_height: int
     a_image: ndarray
     a_screenshot: ndarray
-    a_interest_rect_vert: list[tuple[float, float]]
 
-    a_game_filename: string = r'F:\Games Folder\Electronic Arts\Need for Speed Most ' \
-                              r'Wanted\speed.exe'
-    a_cheat_engine_filename: string = r'C:\Program Files\Cheat Engine 7.4\cheatengine-x86_64.exe'
+    a_game_filename: string = api_settings['game_path']
+    a_cheat_engine_filename: string = api_settings['cheat_engine_path']
 
     a_gps: GPS
 
@@ -65,6 +83,10 @@ class Game:
 
     a_lap_time: LapTime
 
+    a_revolutions_per_minute: RevolutionsPerMinute
+
+    a_wrong_way: WrongWay
+
     a_is_recording: bool
 
     a_user23 = ctypes.windll.user32
@@ -72,6 +94,8 @@ class Game:
     a_list_bitmap: []
 
     a_controls: Controls
+
+    a_font_settings: FontSettings
 
     a_speed: int
 
@@ -93,6 +117,12 @@ class Game:
 
     a_image_manipulation: ImageManipulation
 
+    a_dictionary_menus: dict[str, str]
+
+    a_enabled_game_api_values: EnabledGameApiValues
+
+    a_car_state: CarState
+
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
         self.a_image_manipulation.load_comparable_images()
@@ -104,6 +134,18 @@ class Game:
         self.a_list_bitmap = []
         self.a_speed = 3
         self.a_controls = Controls()
+        self.a_font_settings = FontSettings(
+            par_font=cv2.FONT_HERSHEY_SIMPLEX,
+            par_font_scale=1,
+            par_font_thickness=2,
+            par_line_type=2
+        )
+        self.a_game_state = GameStateNotConnected()
+        self.a_dictionary_menus = {
+            'restart_menu': 'resume_race_text',
+            'standing_menu': 'standings_menu',
+            'attention_restart': 'attention_restart'
+        }
 
         cuda.printCudaDeviceInfo(0)
 
@@ -119,6 +161,9 @@ class Game:
             GpsImageRecognitionStrategyCPU()
             self.a_gps_strategy_enum = GPSStrategyEnum.CPU
 
+        self.a_gps_img_rcg_strategy = GpsImageRecognitionStrategyCPU()
+        self.a_gps_strategy_enum = GPSStrategyEnum.CPU
+
         self.a_gps = GPS(self.a_gps_strategy_enum)
 
     def init_game_memory_objects(self) -> None:
@@ -128,8 +173,11 @@ class Game:
         self.a_speedometer.construct()
         self.a_lap_progress.construct()
         self.a_lap_time.construct()
+        self.a_revolutions_per_minute.construct()
+        self.a_wrong_way.construct()
 
-    def initialize_game(self, par_game_inputs: GameInputs) -> None:
+    def initialize_game(self, par_game_inputs: GameInputs,
+                        par_enabled_game_api_values: EnabledGameApiValues) -> None:
         """
         Initializes the game by starting the game, waiting for it to start, creating and 
             initializing required game objects,and setting the game speed and cheat engine.
@@ -137,10 +185,14 @@ class Game:
         Args:
             par_game_inputs (GameInputs): an instance of GameInputs class containing the 
                 game inputs.
+            par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
+                class containing the enabled game api values. 
 
         Returns:
             None
         """
+        self.a_game_state = GameStateStarting()
+        self.a_enabled_game_api_values = par_enabled_game_api_values
         self.start_game()
         # self.start_cheat_engine()
 
@@ -156,7 +208,11 @@ class Game:
 
         self.a_lap_time = LapTime()
 
-        self.a_cheat_engine.start_cheat_engine()
+        self.a_revolutions_per_minute = RevolutionsPerMinute()
+
+        self.a_wrong_way = WrongWay()
+
+        self.a_cheat_engine.start_cheat_engine(self.api_settings['game_process_name'])
         self.a_cheat_engine.set_speed(self.a_speed)
 
         self.a_is_recording = False
@@ -177,42 +233,61 @@ class Game:
 
         self.a_race_initialised = True
 
+        self.a_controls.release_all_keys()
+
         self.a_cycles_passed = 0
 
-        par_game_inputs.game_initialization_inputs.put((self.a_race_initialised, self.a_speed))
+        par_game_inputs.game_initialization_inputs.put((
+            self.a_race_initialised,
+            self.a_speed
+        ))
 
-    def main_loop(self, par_game_inputs: GameInputs):
+        self.a_car_state = self.create_empty_car_state()
+
+    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-statements
+    def main_loop(self, par_game_inputs: GameInputs,
+                  par_results_path: str,
+                  par_enabled_game_api_values: EnabledGameApiValues):
         """
         Main Loop That Controls All The Game Logic
 
         Args:
             par_game_inputs (GameInputs): An instance of the GameInputs class containing the
                 inputs for the game.
+            par_results_path (str): Path of the folder containing results including graph images
+            par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
+                class containing the enabled game api values. 
 
         Returns:
             None: This method doesn't return anything.
         """
 
-        self.initialize_game(par_game_inputs)
+        self.initialize_game(par_game_inputs, par_enabled_game_api_values)
 
         tmp_start_time = time.time()
         tmp_speed_constant = 1 / self.a_speed
         tmp_frame_counter: int = 0
 
-        while True:
+        tmp_wrong_way_value: int = -1
 
+        while tmp_wrong_way_value == -1:
+            try:
+                tmp_wrong_way_value = self.a_wrong_way.return_is_wrong_way()
+            # pylint: disable=broad-except
+            except Exception as exception:
+                Printer.print_info(f"Waiting for pointers to initialize {exception}", "GAME")
+                time.sleep(1)
+
+        while True:
             # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
 
-            # Define the region of interest
-            self.a_interest_rect_vert = [
-                (0, self.a_height),
-                (self.a_width / 2, self.a_height / 2),
-                (self.a_width, self.a_height)
-            ]
+            self.a_car_state.reset_car_state()
 
-            # Check for quit key
+            # Check for quit key -> !! WARNING - Without this all the windows will be BLANK GREY !!!
             if cv2.waitKey(1) == ord('q'):
                 cv2.destroyAllWindows()
                 break
@@ -222,15 +297,41 @@ class Game:
                 self.a_is_recording = True
                 self.a_list_bitmap = []
 
-            tmp_speed_mph = self.a_speedometer.return_speed_mph()
-            tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
+            grayscale_image, gps_mask, gps_center, gps_size = \
+                self.a_gps_img_rcg_strategy.gps_data_with_greyscale(self.a_gps, self.a_screenshot)
 
-            # tmp_car_offset, tmp_contour = self.calc_car_offset(self.a_screenshot)
-            tmp_car_offset_distance: float
-            tmp_contour: list
-            tmp_car_offset_direction: int
-            tmp_car_offset_distance, tmp_contour, tmp_car_offset_direction = \
-                self.a_gps_img_rcg_strategy.calc_car_offset(self.a_gps, self.a_screenshot)
+            tmp_speed_mph: int = -1
+            if par_enabled_game_api_values.enabled_car_speed_mph:
+                tmp_speed_mph = self.a_speedometer.return_speed_mph()
+            tmp_lap_progress: float = -1
+            if par_enabled_game_api_values.enabled_lap_progress:
+                tmp_lap_progress = self.a_lap_progress.return_lap_completed_percent()
+            tmp_wrong_way_indicator: int = -1
+            if par_enabled_game_api_values.enabled_wrong_way_indicator:
+                tmp_wrong_way_indicator = self.a_wrong_way.return_is_wrong_way()
+            tmp_revolutions_per_minute: float = -1
+            if par_enabled_game_api_values.enabled_revolutions_per_minute:
+                tmp_revolutions_per_minute = \
+                    self.a_revolutions_per_minute.return_revolutions_per_minute()
+            tmp_gps_cropped_greyscale: Optional[ndarray] = None
+            if par_enabled_game_api_values.enabled_mini_map:
+                tmp_gps_cropped_greyscale = \
+                    self.a_gps_img_rcg_strategy.get_half_gps_greyscale(self.a_screenshot,
+                                                                       grayscale_image,
+                                                                       gps_mask, gps_center,
+                                                                       gps_size)
+            tmp_car_offset_distance: float = -1
+            tmp_car_offset_direction: int = -1
+            tmp_contour: Optional[list] = None
+            if par_enabled_game_api_values.enabled_distance_incline_center or \
+                    par_enabled_game_api_values.enabled_distance_offset_center:
+                tmp_car_offset_distance, tmp_contour, tmp_car_offset_direction = \
+                    self.a_gps_img_rcg_strategy.calc_car_offset(
+                        par_gps=self.a_gps,
+                        par_image=self.a_screenshot,
+                        par_gps_mask=gps_mask,
+                        par_gps_center=gps_center
+                    )
 
             self.a_car_distance_offset = tmp_car_offset_distance
             self.a_car_direction_offset = tmp_car_offset_direction
@@ -238,27 +339,8 @@ class Game:
             if tmp_contour is not None:
                 cv2.drawContours(self.a_screenshot, [tmp_contour], -1, (255, 0, 255), -1)
 
-            strings_to_show: ndarray = np.array([
-                str(tmp_speed_mph),
-                str(round(tmp_car_offset_distance, 2)),
-                str(round(tmp_lap_progress, 2)),
-                str(self.a_gps.translate_direction_offset_to_string(tmp_car_offset_direction))
-            ])
-
-            self.show_texts_on_image(par_image=self.a_screenshot,
-                                     par_font_color=(159, 43, 104),
-                                     par_array_of_text=strings_to_show
-                                     )
-
-            cv2.imshow('Main Vision', self.a_screenshot)
-            image_path = 'h:/diplomka_vysledky/results/short_race/second_iteration_training' \
-                         '/scatter_plot.png'
-            image = None
-            if os.path.exists(os.path.abspath(image_path)):
-                # Load the image
-                image = cv2.imread(os.path.abspath(image_path))
-            if image is not None:
-                cv2.imshow('Graph: ', image)
+            backup_screenshot: ndarray = self.a_screenshot
+            self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
 
@@ -272,8 +354,13 @@ class Game:
             while not par_game_inputs.game_restart_inputs.empty():
                 tmp_needs_restart: bool = par_game_inputs.game_restart_inputs.get()
                 if tmp_needs_restart:
+                    self.a_game_state = GameStateRestarting()
+                    self.update_state_on_screen(self.a_screenshot)
+
                     par_game_inputs.game_restart_inputs.put(tmp_needs_restart)
                     self.reset_game_race(0.7 / float(self.a_speed), 0.01 / float(self.a_speed))
+
+                    self.a_game_state = GameStateTraining()
                     par_game_inputs.game_restart_inputs.get()
 
             # .empty() returns False or True, it is not function to empty the Queue
@@ -284,10 +371,28 @@ class Game:
                     par_game_inputs.agent_inputs_state.get_nowait()
                 except Empty:
                     pass  # This case is possible qsize() is unreliable, it is expected behaviour
-            par_game_inputs.agent_inputs_state.put(
-                (self.get_speed_mph(), self.get_car_distance_offset(),
-                 self.a_lap_progress.return_lap_completed_percent(),
-                 self.a_car_direction_offset))
+
+            self.a_car_state.assign_values(
+                par_speed_mph=tmp_speed_mph,
+                par_distance_offset_center=self.get_car_distance_offset(),
+                par_incline_center=self.get_car_direction_offset(),
+                par_lap_progress=tmp_lap_progress,
+                par_wrong_way_indicator=tmp_wrong_way_indicator,
+                par_revolutions_per_minute=tmp_revolutions_per_minute,
+                par_mini_map=tmp_gps_cropped_greyscale
+            )
+
+            par_game_inputs.agent_inputs_state.put(self.a_car_state, )
+
+            self.show_texts_on_image(par_image=backup_screenshot,
+                                     par_font_color=(159, 43, 104),
+                                     par_car_state=self.a_car_state
+                                     )
+
+            self.show_state_on_image(par_image=backup_screenshot,
+                                     par_game_state=self.a_game_state)
+
+            cv2.imshow('Main Vision', backup_screenshot)
 
     def is_race_initialised(self) -> bool:
         """
@@ -330,9 +435,108 @@ class Game:
         """
         return self.a_speedometer.return_speed_mph()
 
+    def get_revolutions_per_minute(self) -> float:
+        """
+        Get Car Revolutions per Minute (RPM)
+        :return: Float value describing Car Revolutions per Minute (RPM)
+        """
+        return self.a_revolutions_per_minute.return_revolutions_per_minute()
+
+    def get_is_wrong_way(self) -> bool:
+        """
+        Gets Car Wrong Way
+        :return: bool value describing if the car is going in a wrong way
+        """
+        return self.a_wrong_way.return_is_wrong_way()
+
+    def show_graph(self, par_image_path: str) -> None:
+        """
+        Displays an image of a graph on the screen.
+
+        Args:
+            par_image_path: A string representing the path to the image file.
+        Returns:
+            None.
+        """
+        image = None
+        if os.path.exists(os.path.abspath(par_image_path)):
+            # Load the image
+            image = cv2.imread(os.path.abspath(par_image_path))
+        if image is not None:
+            cv2.imshow('Graph: ', image)
+
+    def update_state_on_screen(self, par_image: ndarray) -> None:
+        """
+        Updates the game state on the screen.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+    
+        Returns:
+            None
+        """
+        self.show_state_on_image(par_image=par_image,
+                                 par_game_state=self.a_game_state)
+
+        cv2.imshow('Main Vision', self.a_screenshot)
+
+        if cv2.waitKey(1) == ord('q'):
+            cv2.destroyAllWindows()
+
+    def show_state_on_image(self, par_image: ndarray,
+                            par_game_state: AGameState) -> None:
+        """
+        Displays the game state on an image.
+
+        Args:
+            par_image (ndarray): The image to display the game state on.
+            par_game_state (AGameState): The current game state object.
+
+        Returns:
+            None
+        """
+        tmp_new_font_scale: float = self.a_font_settings.font_scale
+
+        test_to_show: str = par_game_state.return_state_text()
+
+        text_size, _ = \
+            cv2.getTextSize(
+                test_to_show,
+                self.a_font_settings.font,
+                tmp_new_font_scale,
+                self.a_font_settings.thickness
+            )
+
+        text_height = text_size[1] + self.a_font_settings.thickness
+        text_splitter_height = int(text_height / 2)
+        x_bottom_left_text_coordinate: int = int(self.a_width / 2) - int(text_size[0] / 2)
+        y_bottom_left_text_coordinate: int = self.a_height - text_height
+
+        bottom_left_corner_of_text: tuple[int, int] = (
+            x_bottom_left_text_coordinate,
+            y_bottom_left_text_coordinate
+        )
+        # Draw the text with an outline in white color
+        cv2.putText(par_image,
+                    test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    (255, 255, 255),
+                    abs(self.a_font_settings.thickness) + 3,
+                    self.a_font_settings.line_type)
+        cv2.putText(par_image, test_to_show,
+                    bottom_left_corner_of_text,
+                    self.a_font_settings.font,
+                    tmp_new_font_scale,
+                    par_game_state.return_color_representation(),
+                    self.a_font_settings.thickness,
+                    self.a_font_settings.line_type)
+        y_bottom_left_text_coordinate += text_height + text_splitter_height
+
     def show_texts_on_image(self, par_image: ndarray,
                             par_font_color: tuple[int, int, int],
-                            par_array_of_text: np.ndarray
+                            par_car_state: CarState,
                             ) -> None:
         """
         Displays multiple texts on an image with specified font, font size, color, thickness, 
@@ -340,46 +544,80 @@ class Game:
 
         Args:
             par_image: An ndarray representing the input image.
-            par_font: The font type to use, e.g. cv2.FONT_HERSHEY_SIMPLEX.
-            par_font_scale: The font size to use.
             par_font_color: The color of the font in RGB format.
-            par_thickness: The thickness of the text.
-            par_line_type: The line type of the text.
-            par_array_of_text: A numpy ndarray containing the text to be displayed.
+            par_car_state: A car state with values to display.
 
         Returns:
             None
         """
 
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
-        thickness = 2
-        line_type = 2
+        tmp_new_font_scale: float = self.a_font_settings.font_scale
+
+        tmp_count_of_values_to_display: int = self.a_enabled_game_api_values.count_enabled_values
+        if self.a_enabled_game_api_values.enabled_mini_map:
+            tmp_count_of_values_to_display -= 1
+
+        if tmp_count_of_values_to_display > 5:
+            tmp_new_font_scale -= 0.2 * (tmp_count_of_values_to_display - 5)
 
         x_bottom_left_text_coordinate: int = 10
-        y_bottom_left_text_coordinates: list[int] = [int(self.a_height / 4), int(self.a_height / 3),
-                                                     int(self.a_height / 2.4),
-                                                     int(self.a_height / 2)]
 
-        texts_to_show: list[str] = [
-            "Speed: " + par_array_of_text[0] + " / mph",
-            "Road Offset: " + par_array_of_text[1] + "",
-            "Completed: " + par_array_of_text[2] + "%",
-            "Incline: " + par_array_of_text[3] + ""
-        ]
+        texts_to_show: list[str] = []
 
-        for index, text_value in enumerate(texts_to_show):
+        if self.a_enabled_game_api_values.enabled_car_speed_mph:
+            texts_to_show.append("Speed: " + str(par_car_state.speed_mph) + " MPH")
+        if self.a_enabled_game_api_values.enabled_distance_offset_center:
+            texts_to_show.append(
+                "Road Offset: " + str(round(par_car_state.distance_offset_center, 2)) + ""
+            )
+        if self.a_enabled_game_api_values.enabled_lap_progress:
+            texts_to_show.append("Completed: " + str(round(par_car_state.lap_progress, 2)) + "%")
+        if self.a_enabled_game_api_values.enabled_distance_incline_center:
+            texts_to_show.append(
+                "Incline: " + str(
+                    self.a_gps.translate_direction_offset_to_string(
+                        int(par_car_state.incline_center)
+                    )
+                ) + ""
+            )
+        if self.a_enabled_game_api_values.enabled_wrong_way_indicator:
+            texts_to_show.append("Wrong way: " + str(par_car_state.wrong_way_indicator) + "")
+        if self.a_enabled_game_api_values.enabled_revolutions_per_minute:
+            texts_to_show.append("RPM: " + str(par_car_state.revolutions_per_minute) + "")
+
+        text_size, _ = \
+            cv2.getTextSize(
+                "Text",
+                self.a_font_settings.font,
+                tmp_new_font_scale,
+                self.a_font_settings.thickness
+            )
+        text_height = text_size[1] + self.a_font_settings.thickness
+        text_splitter_height = int(text_height / 2)
+        y_bottom_left_text_coordinate: int = int(self.a_height / 3.5)
+
+        for text_value in texts_to_show:
             bottom_left_corner_of_text: tuple[int, int] = (
                 x_bottom_left_text_coordinate,
-                y_bottom_left_text_coordinates[index]
+                y_bottom_left_text_coordinate
             )
+            # Draw the text with an outline in white color
+            cv2.putText(par_image,
+                        text_value,
+                        bottom_left_corner_of_text,
+                        self.a_font_settings.font,
+                        tmp_new_font_scale,
+                        (255, 255, 255),
+                        abs(self.a_font_settings.thickness) + 3,
+                        self.a_font_settings.line_type)
             cv2.putText(par_image, text_value,
                         bottom_left_corner_of_text,
-                        font,
-                        font_scale,
+                        self.a_font_settings.font,
+                        tmp_new_font_scale,
                         par_font_color,
-                        thickness,
-                        line_type)
+                        self.a_font_settings.thickness,
+                        self.a_font_settings.line_type)
+            y_bottom_left_text_coordinate += text_height + text_splitter_height
 
     def window_capture(self) -> Tuple[np.ndarray, int, int]:
         """
@@ -392,7 +630,7 @@ class Game:
                - int: Height of the captured image
         """
         # Find the game window
-        hwnd = win32gui.FindWindow(None, 'Need for Speed\u2122 Most Wanted')
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_title_name'])
 
         # Get the window device context
         w_dc = win32gui.GetWindowDC(hwnd)
@@ -557,7 +795,7 @@ class Game:
         """
         Forces Windows to Focus On Game (Bring It To Front)
         """
-        hwnd = win32gui.FindWindow(None, 'Need for Speed\u2122 Most Wanted')
+        hwnd = win32gui.FindWindow(None, self.api_settings['game_title_name'])
         win32gui.SetForegroundWindow(hwnd)
 
     def is_in_correct_restart_state(self, par_screen_image: ndarray) -> RestartStateEnum:
@@ -571,24 +809,21 @@ class Game:
             A value of RestartStateEnum indicating whether the screen is in the restart state, 
             standings state or an unknown state.
         """
-        restart_menu: str = 'resume_race_text'
-        standing_menu: str = 'standings_menu'
-        if restart_menu not in self.a_image_manipulation.comparable_images:
-            print(f"No image found with name {restart_menu}")
-            return RestartStateEnum.UNKNOWN_STATE
-        if standing_menu not in self.a_image_manipulation.comparable_images:
-            print(f"No image found with name {standing_menu}")
-            return RestartStateEnum.UNKNOWN_STATE
 
-        if self.a_image_manipulation.match_template(par_screen_image,
-                                                    self.a_image_manipulation.comparable_images[
-                                                        restart_menu]):
-            return RestartStateEnum.RESTART_STATE
+        for menu_enum_name, menu_image_string_name in self.a_dictionary_menus.items():
+            if menu_image_string_name not in self.a_image_manipulation.comparable_images:
+                Printer.print_error(f"No image found with name {menu_image_string_name}", "GAME")
+                return RestartStateEnum.UNKNOWN_STATE
 
-        if self.a_image_manipulation.match_template(par_screen_image,
-                                                    self.a_image_manipulation.comparable_images[
-                                                        standing_menu]):
-            return RestartStateEnum.STANDINGS_STATE
+            if self.a_image_manipulation.match_template(par_screen_image,
+                                                        self.a_image_manipulation.comparable_images[
+                                                            menu_image_string_name]):
+                if menu_enum_name == 'restart_menu':
+                    return RestartStateEnum.RESTART_STATE
+                if menu_enum_name == 'standing_menu':
+                    return RestartStateEnum.STANDINGS_STATE
+                if menu_enum_name == 'attention_restart':
+                    return RestartStateEnum.ATTENTION_RESTART_STATE
 
         return RestartStateEnum.UNKNOWN_STATE
 
@@ -612,7 +847,8 @@ class Game:
 
         while tmp_current_state != RestartStateEnum.RESTART_STATE:
             tmp_current_state = self.is_in_correct_restart_state(self.window_capture()[0])
-            if tmp_current_state == RestartStateEnum.UNKNOWN_STATE:
+            if tmp_current_state in [RestartStateEnum.UNKNOWN_STATE,
+                                     RestartStateEnum.ATTENTION_RESTART_STATE]:
                 self.a_controls.press_and_release_key(self.a_controls.ESCAPE,
                                                       par_sleep_time_key_press, True)
                 time.sleep(par_sleep_time_delay)
@@ -623,15 +859,32 @@ class Game:
 
         time.sleep(par_sleep_time_delay)
 
-        keys_to_press: list[int] = [self.a_controls.RIGHT_KEY, self.a_controls.ENTER,
-                                    self.a_controls.LEFT_KEY, self.a_controls.ENTER]
-        # Then We Proceed to The Right - Restart Button
-        # Press Enter - Restarts The Race
-        # Then Prompt Will Appear - We Move To The OK Button
-        # Press Enter - Accepts The Prompt
-        for key_to_press in keys_to_press:
-            self.a_controls.press_and_release_key(key_to_press, par_sleep_time_key_press, True)
-            time.sleep(par_sleep_time_delay)
+        tmp_is_not_in_attention_state: bool = True
+        while tmp_is_not_in_attention_state:
+
+            keys_to_press: list[int] = [self.a_controls.RIGHT_KEY, self.a_controls.ENTER,
+                                        self.a_controls.LEFT_KEY]
+            # Then We Proceed to The Right - Restart Button
+            # Press Enter - Restarts The Race
+            # Then Prompt Will Appear - We Move To The OK Button
+            for key_to_press in keys_to_press:
+                self.a_controls.press_and_release_key(key_to_press, par_sleep_time_key_press, True)
+                time.sleep(par_sleep_time_delay)
+
+            tmp_restart_state = self.is_in_correct_restart_state(self.window_capture()[0])
+            if tmp_restart_state == RestartStateEnum.ATTENTION_RESTART_STATE:
+                tmp_is_not_in_attention_state = False
+            else:
+                self.a_controls.press_and_release_key(self.a_controls.ESCAPE,
+                                                      par_sleep_time_key_press, True)
+                time.sleep(par_sleep_time_delay * 2)
+                tmp_is_not_in_attention_state = True
+
+        # If the prompt with Attention (Do you Really Want to Restart) appears press Enter
+        time.sleep(par_sleep_time_delay)
+
+        self.a_controls.press_and_release_key(self.a_controls.ENTER, par_sleep_time_key_press, True)
+        time.sleep(par_sleep_time_delay)
 
         time.sleep(1 * self.a_speed)
 
@@ -691,3 +944,11 @@ class Game:
             if index == 22:
                 # Should Wait to Start the Race
                 time.sleep(par_sleep_time_delay * 5)
+
+    def create_empty_car_state(self) -> CarState:
+        """
+        Initializes car state with default values
+        Returns:
+            An CarState object with default values
+        """
+        return CarState()

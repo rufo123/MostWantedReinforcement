@@ -8,15 +8,20 @@ algorithm.
 import pickle
 import warnings
 from datetime import datetime
+from typing import Union
 
 import numpy as np
 import torch
+# noinspection PyPep8Naming
 import torch.nn.functional as F
 from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
+from envs.strategy.reward.a_reward_strategy import ARewardStrategy
+from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStrategy
 from game_inputs import GameInputs
-from utils.stats import MovingAverageScore, write_to_file
+from utils.print_utils.printer import Printer
+from utils.stats import MovingAverageScore, write_to_file, append_to_file
 
 
 # methods support_to_scalar and scalar_to_support are implemented
@@ -71,6 +76,7 @@ def scalar_to_support(par_x, par_support_size):
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-locals
 # pylint: disable=unused-variable
+# pylint: disable=too-many-statements
 def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
            count_of_steps, gamma, gae_lambda) -> None:
     """
@@ -89,9 +95,10 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     Returns:
     None.
     """
-    envs = [env_func(env_param) for _ in range(count_of_envs)]
+    envs = [env_func(*env_param) for _ in range(count_of_envs)]
     observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
     game_score = np.zeros(count_of_envs)
+    steps_taken_storage = np.zeros(count_of_steps)
 
     mem_log_probs = torch.zeros((count_of_steps, count_of_envs, 1))
     mem_actions = torch.zeros((count_of_steps, count_of_envs, 1), dtype=torch.long)
@@ -101,8 +108,10 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     for iteration in range(count_of_iterations):
         mem_non_terminals = torch.ones((count_of_steps, count_of_envs, 1))
         scores = []
+        steps_taken_list = []
+
         for step in range(count_of_steps):
-            print("STEP: " + str(step))
+            Printer.print_basic("STEP: " + str(step), "AGENT")
             connection.send(observations.float())
             logits, values = connection.recv()
             probs = F.softmax(logits, dim=-1)
@@ -114,17 +123,20 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
             mem_values[step] = values
 
             for idx in range(count_of_envs):
-                observation, reward, terminal = envs[idx].step(actions[idx, 0].item())
+                observation, reward, terminal, steps_took_to_complete = envs[idx].step(
+                    actions[idx, 0].item())
                 mem_rewards[step, idx, 0] = reward
                 game_score[idx] += reward
-                print('Single Reward: ' + str(reward))
-                print('Cumulative Reward: ' + str(game_score[idx]))
+                Printer.print_info("Single Reward: " + str(reward), "AGENT")
+                Printer.print_info("Cumulative Reward: " + str(game_score[idx]), "AGENT")
                 if reward < 0:
                     mem_non_terminals[step, idx, 0] = 0
                 if terminal:
                     mem_non_terminals[step, idx, 0] = 0
                     scores.append(game_score[idx])
                     game_score[idx] = 0
+                    steps_taken_storage[idx] = steps_took_to_complete
+                    steps_taken_list.append(steps_taken_storage[idx])
                     observation = envs[idx].reset()
                 # observations[idx] = observation.clone().detach()
                 with warnings.catch_warnings():
@@ -132,6 +144,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                     observations[idx] = torch.tensor(observation)
 
         connection.send(observations.float())
+        # noinspection PyUnboundLocalVariable
         mem_values[step + 1] = connection.recv()
         mem_rewards = torch.clamp(mem_rewards, -1.0, 1.0)
         advantages = torch.zeros((count_of_steps, count_of_envs, 1))
@@ -145,7 +158,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
             values[step] = t_gae + mem_values[step]
             advantages[step] = t_gae.clone()
 
-        connection.send([mem_log_probs, mem_actions, values, advantages, scores])
+        connection.send([mem_log_probs, mem_actions, values, advantages, scores, steps_taken_list])
     connection.recv()
     connection.close()
 
@@ -200,10 +213,11 @@ class Agent:
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
-    def train(self, env_param: GameInputs, env_func, count_of_actions,
+    def train(self, env_param: tuple[GameInputs, ARewardStrategy, AStateCalculationStrategy],
+              env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
-              batch_size=512, input_dim=4):
+              batch_size=512, input_dim: Union[int, tuple] = 4):
         """
         Trains the agent using Proximal Policy Optimization with Generalized Advantage Estimation.
 
@@ -219,16 +233,23 @@ class Agent:
         :param batch_size: the size of the batches used to update the network
         :param input_dim: the dimensionality of the observation space
         """
-        print('Training is starting')
 
-        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took'
+        input_dim_readjusted: tuple
+        if isinstance(input_dim, int):
+            input_dim_readjusted = (input_dim,)
+        else:
+            input_dim_readjusted = input_dim
+
+        Printer.print_info("Training is starting", "AGENT")
+
+        logs_score = 'iteration,episode,avg_score,best_avg_score,hours_took,steps_took'
         logs_loss = 'iteration,episode,policy,value,entropy'
 
         score = MovingAverageScore()
 
         if self.loaded_score_path != "":
             with open(self.loaded_score_path, "rb") as loaded_score:
-                pickle.load(loaded_score)
+                score = pickle.load(loaded_score)
 
         buffer_size = count_of_processes * count_of_envs * count_of_steps
         batches_per_iteration = count_of_epochs * buffer_size / batch_size
@@ -244,7 +265,7 @@ class Agent:
             process.start()
 
         mem_dim = (count_of_processes, count_of_steps, count_of_envs)
-        mem_observations = torch.zeros((mem_dim + (input_dim,)), device=self.device)
+        mem_observations = torch.zeros((mem_dim + input_dim_readjusted), device=self.device)
         mem_actions = torch.zeros((*mem_dim, 1), device=self.device, dtype=torch.long)
         mem_log_probs = torch.zeros((*mem_dim, 1), device=self.device)
         if self.support_to_value:
@@ -261,7 +282,7 @@ class Agent:
                 mem_observations[:, step] = observations
 
                 with torch.no_grad():
-                    logits, values = self.model(observations.view(-1, *(input_dim,)))
+                    logits, values = self.model(observations.view(-1, *input_dim_readjusted))
 
                 # If you selected actions in the main process, your iteration
                 # would last about 0.5 seconds longer (measured on 2 processes)
@@ -280,7 +301,7 @@ class Agent:
             observations = torch.stack(observations).to(self.device)
 
             with torch.no_grad():
-                _, values = self.model(observations.view(-1, *(input_dim,)))
+                _, values = self.model(observations.view(-1, *input_dim_readjusted))
 
             if self.support_to_value:
                 values = support_to_scalar(values, self.value_support_size).view(
@@ -291,8 +312,11 @@ class Agent:
             for idx in range(count_of_processes):
                 connections[idx].send(values[idx])
 
+            iteration_steps_took = 0
+
             for idx in range(count_of_processes):
-                log_probs, actions, values, advantages, scores = connections[idx].recv()
+                log_probs, actions, values, advantages, scores, steps_taken_list = connections[
+                    idx].recv()
                 mem_actions[idx] = actions.to(self.device)
                 mem_log_probs[idx] = log_probs.to(self.device)
                 if self.support_to_value:
@@ -304,6 +328,7 @@ class Agent:
                     mem_values[idx] = values.to(self.device)
                 mem_advantages[idx] = advantages.to(self.device)
                 score.add(scores)
+                iteration_steps_took = np.mean(steps_taken_list)
 
             avg_score, best_score = score.mean()
             print('iteration: ', iteration, '\taverage score: ', avg_score)
@@ -312,8 +337,12 @@ class Agent:
                 torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
                 with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
                     pickle.dump(score, loaded_score)
+            elif iteration % 100 == 0:
+                torch.save(self.model.state_dict(), self.path + 'model' + str(iteration) + '.pt')
+                with open(self.path + 'score' + str(iteration), "wb") as loaded_score:
+                    pickle.dump(score, loaded_score)
 
-            mem_observations = mem_observations.view(-1, *(input_dim,))
+            mem_observations = mem_observations.view(-1, *input_dim_readjusted)
             mem_actions = mem_actions.view(-1, 1)
             mem_log_probs = mem_log_probs.view(-1, 1)
 
@@ -360,10 +389,11 @@ class Agent:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                     self.optimizer.step()
 
-            mem_observations = mem_observations.view((mem_dim + (input_dim,)))
+            mem_observations = mem_observations.view((mem_dim + input_dim_readjusted))
             mem_actions = mem_actions.view((*mem_dim, 1))
             mem_log_probs = mem_log_probs.view((*mem_dim, 1))
             if self.support_to_value:
+                # noinspection PyUnusedLocal
                 mem_values = mem_values = mem_values.view((*mem_dim, self.value_support_interval))
             else:
                 mem_values = mem_values.view((*mem_dim, 1))
@@ -372,11 +402,14 @@ class Agent:
             elapsed_time = datetime.now() - self.start_time
             hours_taken = elapsed_time.total_seconds() / 3600
 
-            logs_score += '\n' + str(iteration) + ',' \
-                          + str(score.get_count_of_episodes()) + ',' \
-                          + str(avg_score) + ',' \
-                          + str(score.get_best_avg_score()) + ',' \
-                          + str(round(hours_taken, 2))
+            actual_score: str = '\n' + str(iteration) + ',' \
+                                + str(score.get_count_of_episodes()) + ',' \
+                                + str(avg_score) + ',' \
+                                + str(score.get_best_avg_score()) + ',' \
+                                + str(round(hours_taken, 2)) + ',' \
+                                + str(round(iteration_steps_took))
+
+            logs_score += actual_score
 
             logs_loss += '\n' + str(iteration) + ',' \
                          + str(avg_score) + ',' \
@@ -387,7 +420,12 @@ class Agent:
             if iteration % 10 == 0:
                 write_to_file(logs_score, self.path + 'logs_score.txt')
                 write_to_file(logs_loss, self.path + 'logs_loss.txt')
-                graph.make_graph.scatter_plot_save(self.path + 'logs_score.txt', self.path)
+                append_to_file(
+                    par_filename=self.path + 'logs_final.txt',
+                    par_log_without_header=actual_score,
+                    par_log_with_header=logs_score
+                )
+                graph.make_graph.scatter_plot_save(self.path + 'logs_final.txt', self.path)
                 torch.save(self.model.state_dict(), self.path + 'latest_model' + '.pt')
                 with open(self.path + 'latest_score', "wb") as loaded_score:
                     pickle.dump(score, loaded_score)

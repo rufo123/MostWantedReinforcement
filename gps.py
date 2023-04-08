@@ -1,4 +1,7 @@
-""" Module providing image recognition support, known as OpenCV2 """
+"""
+This module provides a class representing a GPS object with the ability to calculate
+    distance and direction offsets using CPU or GPU strategy.
+"""
 import cv2
 import numpy as np
 from numpy import ndarray
@@ -59,7 +62,7 @@ class GPS:
         """
         return self.a_gps_strategy.make_gps_contour(par_gps_image, par_screenshot, par_gps_center)
 
-    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int]]:
+    def get_gps_mask(self, par_greyscale) -> tuple[ndarray, tuple[int, int], tuple[int, int]]:
         """
         Generates a GPS mask based on a greyscale image.
 
@@ -201,8 +204,6 @@ class GPS:
         cv2.createTrackbar('Min', 'image', 0, 255, self.nothing)
         cv2.createTrackbar('Max', 'image', 0, 255, self.nothing)
 
-        gray_min = gray_max = 0
-
         while 1:
             # Get current positions of all trackbars
             gray_min = cv2.getTrackbarPos('Min', 'image')
@@ -257,7 +258,6 @@ class GPS:
         cv2.setTrackbarPos('VMax', 'image', 255)
 
         # Initialize HSV min/max values
-        h_min = s_min = v_min = h_max = s_max = v_max = 0
         ph_min = ps_min = pv_min = ph_max = ps_max = pv_max = 0
 
         while 1:

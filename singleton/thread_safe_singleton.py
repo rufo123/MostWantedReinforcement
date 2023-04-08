@@ -1,4 +1,6 @@
-""" Module providing multiprocessing support, imports Lock"""
+"""
+This module provides a thread-safe singleton metaclass.
+"""
 from multiprocessing import Lock
 
 

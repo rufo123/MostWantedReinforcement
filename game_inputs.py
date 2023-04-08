@@ -1,4 +1,6 @@
-"""" Module providing multiprocessing Support"""
+"""
+This module provides GameInputs class representing the inputs to a game
+"""
 import multiprocessing as mp
 
 
