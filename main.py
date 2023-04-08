@@ -69,12 +69,12 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
             the game.
 
     Returns:
-        None: This function doesn't return anything.
+        None: This function doesn't return anything.a2
     """
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 660
+        'previous_model_iter_number': 3370
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Printer.print_basic(torch.version.cuda, "MAIN")
@@ -117,7 +117,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
         os.mkdir(os.path.abspath(path))
         Printer.print_success("new directory has been created", "MAIN")
 
-    dim1 = (4, 48, 48)
+    dim1 = selected_configuration.return_dimensional_input()
     count_of_actions = 8
     model = PolicyValueModel(selected_configuration.return_model())
     model.to(device)
@@ -183,11 +183,11 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
 
 if __name__ == '__main__':
-    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
-    # '\\score_final_exp2.txt'), 'avg_score')
-    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
-    # '\\score_final_exp2.txt'), 'steps_took')
-    # exit()
+    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    #'\\logs_final.txt'), 'avg_score')
+    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    #'\\logs_final.txt'), 'steps_took')
+    #exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

@@ -11,7 +11,6 @@ the state based on the speed of the car, its distance offset from the center of 
 and its distance offset from the center of the track.
 """
 
-import numpy
 import torch
 
 from car_states.car_state import CarState
@@ -32,7 +31,7 @@ class BasicStateStrategy(AStateCalculationStrategy):
     """
 
     # pylint-disable=unused-argument
-    def calculate_state(self, par_car_state: CarState, par_action_taken=None) -> numpy.ndarray:
+    def calculate_state(self, par_car_state: CarState, par_action_taken=None) -> torch.Tensor:
         """
         Calculates the state of the environment based on the car state.
 
@@ -44,11 +43,9 @@ class BasicStateStrategy(AStateCalculationStrategy):
             The calculated state as a tensor.
             
         """
-        new_state = torch.tensor([
+        return torch.tensor([
             par_car_state.speed_mph,
             par_car_state.distance_offset_center,
             par_car_state.lap_progress,
             par_car_state.distance_offset_center
         ])
-
-        return new_state.numpy()

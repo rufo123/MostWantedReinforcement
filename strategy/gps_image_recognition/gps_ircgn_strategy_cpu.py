@@ -89,26 +89,108 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
         """
         # Get Gps Mask in Greyscale
 
-        # 1. Apply Mask to Greyscale
-        tmp_gps_greyscale = \
-            cv2.bitwise_and(par_grayscale_image, par_grayscale_image, mask=par_gps_mask)
+        # Applying Mask and Getting bounding box can be run in parallel
 
-        # 2. Get bounding box around gps greyscale where are non 0 pixels
+        tmp_gps_greyscale = self.__apply_mask(par_grayscale_image, par_gps_mask)
+        coord_x, coord_y, coord_width, coord_height = \
+            self.__get_bounding_box(par_gps_center, par_gps_size)
+
+        cropped_gps_greyscale = self.__crop_and_resize_gps(tmp_gps_greyscale,
+                                                           coord_x,
+                                                           coord_y,
+                                                           coord_width,
+                                                           coord_height
+                                                           )
+        self.__show_rectangle_on_image(par_image,
+                                       coord_x,
+                                       coord_y,
+                                       coord_width,
+                                       coord_height)
+
+        return cropped_gps_greyscale
+
+    def __crop_and_resize_gps(self, par_gps_greyscale: ndarray,
+                              par_coords_x: int,
+                              par_coords_y: int,
+                              par_coords_width: int,
+                              par_coords_height: int
+                              ) -> ndarray:
+        """
+        Crop the GPS greyscale image to the specified coordinates and resize it to 48x48.
+
+        Args:
+            par_gps_greyscale: A numpy array representing the GPS greyscale image.
+            par_coords_x: The x-coordinate of the top-left corner of the bounding box.
+            par_coords_y: The y-coordinate of the top-left corner of the bounding box.
+            par_coords_width: The width of the bounding box.
+            par_coords_height: The height of the bounding box.
+
+        Returns:
+            A numpy array representing the cropped and resized GPS greyscale image.
+        """
+        par_gps_greyscale = \
+            par_gps_greyscale[
+            par_coords_y:par_coords_y + par_coords_height,
+            par_coords_x:par_coords_x + par_coords_width
+            ]
+
+        par_gps_greyscale = cv2.resize(par_gps_greyscale, (48, 48))
+        return par_gps_greyscale
+
+    def __show_rectangle_on_image(self, par_image: ndarray, par_coords_x: int,
+                                  par_coords_y: int,
+                                  par_coords_width: int,
+                                  par_coords_height: int) -> None:
+        """
+        Draw a rectangle on the input image.
+
+        Args:
+            par_image: A numpy array representing the image to draw the rectangle on.
+            par_coords_x: The x-coordinate of the top-left corner of the bounding box.
+            par_coords_y: The y-coordinate of the top-left corner of the bounding box.
+            par_coords_width: The width of the bounding box.
+            par_coords_height: The height of the bounding box.
+
+        Returns:
+            None
+        """
+        cv2.rectangle(par_image, (par_coords_x, par_coords_y),
+                      (par_coords_x + par_coords_width, par_coords_y + par_coords_height),
+                      (255, 0, 255), 2)
+
+    def __get_bounding_box(self,
+                           par_gps_center: tuple[int, int],
+                           par_gps_size: tuple[int, int]
+                           ) -> tuple[int, int, int, int]:
+        """
+        Gets the bounding box around the GPS greyscale where there are non-zero pixels.
+
+        Args:
+            par_gps_center: A tuple representing the center of the GPS.
+            par_gps_size: A tuple representing the size of the GPS.
+
+        Returns:
+            A tuple representing the bounding box around the GPS greyscale.
+        """
         coord_x = int(par_gps_center[0] - par_gps_size[0])
         coord_y = int(par_gps_center[1] - par_gps_size[1])
         coord_width = int(par_gps_size[0] * 2)
         coord_height = int(par_gps_size[1])
+        return coord_x, coord_y, coord_width, coord_height
 
-        cropped_gps_greyscale = \
-            tmp_gps_greyscale[coord_y:coord_y + coord_height, coord_x:coord_x + coord_width]
+    def __apply_mask(self, par_grayscale_image: ndarray, par_gps_mask: ndarray) -> ndarray:
+        """
+        Applies a GPS mask to a grayscale image.
 
-        cv2.rectangle(par_image, (coord_x, coord_y),
-                      (coord_x + coord_width, coord_y + coord_height),
-                      (255, 0, 255), 2)
+        Args:
+            par_grayscale_image: A numpy array representing the grayscale image to apply the GPS
+             mask to.
+            par_gps_mask: A numpy array representing the GPS mask to apply to the grayscale image.
 
-        cv2.resize(cropped_gps_greyscale, (48, 48))
-
-        return cropped_gps_greyscale
+        Returns:
+            A numpy array representing the resulting masked grayscale image.
+        """
+        return cv2.bitwise_and(par_grayscale_image, par_grayscale_image, mask=par_gps_mask)
 
     def calc_car_offset(self, par_gps: GPS, par_image: ndarray,
                         par_gps_mask: ndarray, par_gps_center: tuple[int, int]
@@ -145,16 +227,16 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
         tmp_gps_greyscale = cv2.inRange(tmp_gps_hsv, tmp_lower_bound, tmp_upper_bound)
 
         # Create GPS contour
-        tmp_contour = par_gps_mask.make_gps_contour(tmp_gps_greyscale, par_image, par_gps_center)
+        tmp_contour = par_gps.make_gps_contour(tmp_gps_greyscale, par_image, par_gps_center)
 
         # car position
-        tmp_car_pos = par_gps_mask.get_car_point(par_image, par_gps_center)
+        tmp_car_pos = par_gps.get_car_point(par_image, par_gps_center)
 
         # Get car offset and lap progress
-        tmp_car_offset_dist = par_gps_mask.polygon_contour_test(tmp_contour, tmp_car_pos)
+        tmp_car_offset_dist = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
 
-        tmp_car_directional_offset: int = par_gps_mask.check_direction_point_to_contour(tmp_contour,
-                                                                                        tmp_car_pos)
+        tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour,
+                                                                                   tmp_car_pos)
 
         self.a_car_offset = tmp_car_offset_dist
 

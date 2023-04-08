@@ -58,4 +58,13 @@ class IConfiguration(ABC):
     
           Returns:
               str: a name of the experiment.
-          """
+        """
+
+    @abstractmethod
+    def return_dimensional_input(self) -> tuple:
+        """
+        Return a dimensional input for the experiment.
+    
+          Returns:
+              tuple: a dimensional input for the experiment.
+        """

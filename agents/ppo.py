@@ -242,7 +242,7 @@ class Agent:
 
         Printer.print_info("Training is starting", "AGENT")
 
-        logs_score = 'iteration,episode,avg_score,best_avg_score,best_score,hours_took,steps_took'
+        logs_score = 'iteration,episode,avg_score,best_avg_score,hours_took,steps_took'
         logs_loss = 'iteration,episode,policy,value,entropy'
 
         score = MovingAverageScore()

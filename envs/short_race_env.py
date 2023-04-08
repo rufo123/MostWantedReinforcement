@@ -39,6 +39,8 @@ class Env:
     a_enabled_game_api_values: EnabledGameApiValues
     a_state_matrix: np.ndarray
 
+    a_edited_car_state: CarStateInEnvironment
+
     default_settings = {
         'step_mul': 0,
         'game_steps_per_episode': 150,
@@ -70,6 +72,9 @@ class Env:
         self.a_game_inputs: GameInputs = par_game_inputs
         self.a_lap_percent_curr = 0.00
 
+        self.a_edited_car_state = CarStateInEnvironment()
+        self.a_edited_car_state.reset_car_state()
+
         self.a_state_matrix = np.zeros((5, 5), dtype=float) - 1
 
     def make_state(self):
@@ -81,6 +86,7 @@ class Env:
         """
         terminal = False
         tmp_reward: float = 0
+        self.a_lap_percent_curr = 0.00
         if self.a_game_inputs.agent_inputs_state is None:
             pass
 
@@ -105,6 +111,7 @@ class Env:
         Returns:
         A numpy array representing the initial state of the environment.
         """
+        self.a_lap_percent_curr = 0.00
         self.controls.release_all_keys()
         self.controls.reset_directional_controls()
         state, _, _ = self.make_state()
@@ -123,6 +130,7 @@ class Env:
             time.sleep(1)
         self.a_step_counter = 0
         self.controls.a_is_executing_critical_action = False
+        self.a_edited_car_state.reset_car_state()
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
@@ -158,6 +166,7 @@ class Env:
         A tuple containing the next state, reward, done flag, and steps taken.
         """
         self.a_step_counter += 1
+        self.a_edited_car_state.reset_car_state()
         Printer.print_basic("--------------------")
         Printer.print_info("Step Internal Counter: " + str(self.a_step_counter), "ENV")
         terminal = False
@@ -174,11 +183,12 @@ class Env:
         tmp_lap_progress_diff: float = \
             self.get_lap_progress_dif(tmp_car_state_from_game.lap_progress)
 
-        edited_car_state: CarStateInEnvironment \
-            = CarStateInEnvironment(par_lap_progress_difference=tmp_lap_progress_diff,
-                                    par_car_state=tmp_car_state_from_game)
+        self.a_edited_car_state.assign_values(
+            par_lap_progress_difference=tmp_lap_progress_diff,
+            par_car_state=tmp_car_state_from_game
+        )
 
-        new_reward, terminal = self.a_reward_strategy.evaluate_reward(edited_car_state,
+        new_reward, terminal = self.a_reward_strategy.evaluate_reward(self.a_edited_car_state,
                                                                       self.game_steps_per_episode,
                                                                       self.a_step_counter,
                                                                       terminal)
@@ -188,7 +198,7 @@ class Env:
 
         new_state = self.a_state_calculation_strategy.calculate_state(
             par_action_taken=action,
-            par_car_state=edited_car_state
+            par_car_state=self.a_edited_car_state
         )
 
         # new_state = torch.tensor([tmp_speed, tmp_car_distance_offset,

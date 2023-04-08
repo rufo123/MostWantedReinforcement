@@ -85,5 +85,14 @@ class ThirdExperimentBiggerStateNormalized(IConfiguration):
             par_enabled_lap_progress=True,
         )
 
+    def return_dimensional_input(self) -> tuple:
+        """
+        Return a dimensional input for the experiment (25,).
+
+          Returns:
+              tuple: a dimensional input for the experiment (25,).
+        """
+        return self.a_configuration_factory.create_dimensional_input(25)
+
     def return_name(self) -> str:
         return "experiment_third_bigger_state_normalized"

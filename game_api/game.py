@@ -121,6 +121,8 @@ class Game:
 
     a_enabled_game_api_values: EnabledGameApiValues
 
+    a_car_state: CarState
+
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
         self.a_image_manipulation.load_comparable_images()
@@ -240,9 +242,11 @@ class Game:
             self.a_speed
         ))
 
-    #pylint: disable=too-many-locals
-    #pylint: disable=too-many-branches
-    #pylint: disable=too-many-statements
+        self.a_car_state = self.create_empty_car_state()
+
+    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-statements
     def main_loop(self, par_game_inputs: GameInputs,
                   par_results_path: str,
                   par_enabled_game_api_values: EnabledGameApiValues):
@@ -266,10 +270,22 @@ class Game:
         tmp_speed_constant = 1 / self.a_speed
         tmp_frame_counter: int = 0
 
+        tmp_wrong_way_value: int = -1
+
+        while tmp_wrong_way_value == -1:
+            try:
+                tmp_wrong_way_value = self.a_wrong_way.return_is_wrong_way()
+            # pylint: disable=broad-except
+            except Exception as exception:
+                Printer.print_info(f"Waiting for pointers to initialize {exception}", "GAME")
+                time.sleep(1)
+
         while True:
             # Capture screenshot and convert to numpy array
             self.a_screenshot, self.a_width, self.a_height = self.window_capture()
             self.a_screenshot = np.array(self.a_screenshot)
+
+            self.a_car_state.reset_car_state()
 
             # Check for quit key -> !! WARNING - Without this all the windows will be BLANK GREY !!!
             if cv2.waitKey(1) == ord('q'):
@@ -356,7 +372,7 @@ class Game:
                 except Empty:
                     pass  # This case is possible qsize() is unreliable, it is expected behaviour
 
-            car_state = CarState(
+            self.a_car_state.assign_values(
                 par_speed_mph=tmp_speed_mph,
                 par_distance_offset_center=self.get_car_distance_offset(),
                 par_incline_center=self.get_car_direction_offset(),
@@ -366,11 +382,11 @@ class Game:
                 par_mini_map=tmp_gps_cropped_greyscale
             )
 
-            par_game_inputs.agent_inputs_state.put(car_state, )
+            par_game_inputs.agent_inputs_state.put(self.a_car_state, )
 
             self.show_texts_on_image(par_image=backup_screenshot,
                                      par_font_color=(159, 43, 104),
-                                     par_car_state=car_state
+                                     par_car_state=self.a_car_state
                                      )
 
             self.show_state_on_image(par_image=backup_screenshot,
@@ -557,7 +573,13 @@ class Game:
         if self.a_enabled_game_api_values.enabled_lap_progress:
             texts_to_show.append("Completed: " + str(round(par_car_state.lap_progress, 2)) + "%")
         if self.a_enabled_game_api_values.enabled_distance_incline_center:
-            texts_to_show.append("Incline: " + str(par_car_state.incline_center) + "")
+            texts_to_show.append(
+                "Incline: " + str(
+                    self.a_gps.translate_direction_offset_to_string(
+                        int(par_car_state.incline_center)
+                    )
+                ) + ""
+            )
         if self.a_enabled_game_api_values.enabled_wrong_way_indicator:
             texts_to_show.append("Wrong way: " + str(par_car_state.wrong_way_indicator) + "")
         if self.a_enabled_game_api_values.enabled_revolutions_per_minute:
@@ -855,7 +877,7 @@ class Game:
             else:
                 self.a_controls.press_and_release_key(self.a_controls.ESCAPE,
                                                       par_sleep_time_key_press, True)
-                time.sleep(par_sleep_time_delay)
+                time.sleep(par_sleep_time_delay * 2)
                 tmp_is_not_in_attention_state = True
 
         # If the prompt with Attention (Do you Really Want to Restart) appears press Enter
@@ -922,3 +944,11 @@ class Game:
             if index == 22:
                 # Should Wait to Start the Race
                 time.sleep(par_sleep_time_delay * 5)
+
+    def create_empty_car_state(self) -> CarState:
+        """
+        Initializes car state with default values
+        Returns:
+            An CarState object with default values
+        """
+        return CarState()

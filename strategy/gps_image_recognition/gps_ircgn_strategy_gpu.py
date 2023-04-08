@@ -175,15 +175,15 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
         tmp_gps_greyscale = cv2.cuda.inRange(tmp_gps_hsv, tmp_lower_bound, tmp_upper_bound)
 
         # Create GPS contour
-        tmp_contour = par_gps_mask.make_gps_contour(tmp_gps_greyscale, par_image, par_gps_center)
+        tmp_contour = par_gps.make_gps_contour(tmp_gps_greyscale, par_image, par_gps_center)
 
         # car position
-        tmp_car_pos = par_gps_mask.get_car_point(par_image, par_gps_center)
+        tmp_car_pos = par_gps.get_car_point(par_image, par_gps_center)
 
         # Get car offset and lap progress
-        tmp_car_offset_dist: float = par_gps_mask.polygon_contour_test(tmp_contour, tmp_car_pos)
+        tmp_car_offset_dist: float = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
 
-        tmp_car_directional_offset: int = par_gps_mask.check_direction_point_to_contour(tmp_contour,
+        tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour,
                                                                                         tmp_car_pos)
 
         self.a_car_offset = tmp_car_offset_dist

@@ -57,7 +57,7 @@ class SixthExperimentMinimap(IConfiguration):
             ARewardStrategy: An instance of `ARewardStrategy`.
         """
         return self.a_configuration_factory.create_reward_strategy(
-            RewardStrategyEnum.FOURTH_REWARD_STRATEGY
+            RewardStrategyEnum.FIFTH_REWARD_STRATEGY
         )
 
     def return_state_calc_strategy(self) -> AStateCalculationStrategy:
@@ -88,6 +88,15 @@ class SixthExperimentMinimap(IConfiguration):
             par_enabled_lap_progress=True,
             par_enabled_wrong_way_indicator=True
         )
+
+    def return_dimensional_input(self) -> tuple:
+        """
+        Return a dimensional input for the experiment (4,48,48).
+
+          Returns:
+              tuple: a dimensional input for the experiment (4,48,48).
+        """
+        return self.a_configuration_factory.create_dimensional_input((4, 48, 48))
 
     def return_name(self) -> str:
         return "experiment_mini_map"

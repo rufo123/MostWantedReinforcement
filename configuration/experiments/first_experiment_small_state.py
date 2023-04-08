@@ -83,5 +83,14 @@ class FirstExperimentSmallState(IConfiguration):
             par_enabled_lap_progress=True,
         )
 
+    def return_dimensional_input(self) -> tuple:
+        """
+        Return a dimensional input for the experiment (4,).
+
+          Returns:
+              tuple: a dimensional input for the experiment (4,).
+        """
+        return self.a_configuration_factory.create_dimensional_input(4)
+
     def return_name(self) -> str:
         return "experiment_first_small_state"

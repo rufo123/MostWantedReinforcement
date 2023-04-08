@@ -2,6 +2,8 @@
 Module containing the abstract factory class for creating models for a reinforcement learning agent
  to play Need for Speed Most Wanted (2005).
 """
+from typing import Union
+
 from car_states.enabled_game_api_values import EnabledGameApiValues
 from envs.strategy.reward.a_reward_strategy import ARewardStrategy
 from envs.strategy.reward.reward_strategy_enum import RewardStrategyEnum
@@ -46,6 +48,25 @@ class ConfigurationFactory:
         :return: An object that implements the state calculation strategy.
         """
         return par_state_calc_strategy.return_strategy()
+
+    def create_dimensional_input(self, par_input_dim: Union[tuple, int] = 4) -> tuple:
+        """
+        Creates a dimensional input tuple.
+
+        Args:
+            par_input_dim (Union[tuple, int]): The input dimensionality. If a tuple, returns it as
+             is. 
+                If an integer, returns a tuple with the integer as its only element. Default: 4.
+
+        Returns:
+            tuple: A tuple representing the input dimensionality.
+
+        Raises:
+            None.
+        """
+        if isinstance(par_input_dim, tuple):
+            return par_input_dim
+        return (par_input_dim,)
 
     # pylint: disable= too-many-arguments
     def create_enabled_game_api_values(
