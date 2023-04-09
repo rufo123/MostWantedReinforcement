@@ -33,6 +33,7 @@ class ActionTranslatorEnum(Enum):
         """
         return f"{self.name} ({self.value})"
 
+    # noinspection PyUnusedLocal
     def take_action(self, par_controls: Controls,
                     par_sleep_time: float = 1) -> int:
         """

@@ -17,6 +17,7 @@ import torch.nn.functional as F
 from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
+from car_states.enabled_game_api_values import EnabledGameApiValues
 from envs.strategy.reward.a_reward_strategy import ARewardStrategy
 from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStrategy
 from game_inputs import GameInputs
@@ -27,6 +28,7 @@ from utils.stats import MovingAverageScore, write_to_file, append_to_file
 # methods support_to_scalar and scalar_to_support are implemented
 # by Davaud Werner in https://github.com/werner-duvaud/muzero-general
 
+# noinspection DuplicatedCode
 def support_to_scalar(par_logits, par_support_size):
     """
     Transform a categorical representation to a scalar
@@ -51,6 +53,7 @@ def support_to_scalar(par_logits, par_support_size):
     return x_return
 
 
+# noinspection DuplicatedCode
 def scalar_to_support(par_x, par_support_size):
     """
     Transform a scalar to a categorical representation with (2 * support_size + 1) categories
@@ -77,6 +80,7 @@ def scalar_to_support(par_x, par_support_size):
 # pylint: disable=too-many-locals
 # pylint: disable=unused-variable
 # pylint: disable=too-many-statements
+# noinspection DuplicatedCode
 def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
            count_of_steps, gamma, gae_lambda) -> None:
     """
@@ -164,6 +168,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
 
 
 # pylint: disable=too-many-instance-attributes
+# noinspection DuplicatedCode
 class Agent:
     """
     A reinforcement learning agent using Proximal Policy Optimization with Generalized Advantage
@@ -213,7 +218,10 @@ class Agent:
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
-    def train(self, env_param: tuple[GameInputs, ARewardStrategy, AStateCalculationStrategy],
+    def train(self,
+              env_param: tuple[GameInputs, ARewardStrategy,
+              AStateCalculationStrategy, EnabledGameApiValues
+              ],
               env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,

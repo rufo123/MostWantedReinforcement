@@ -15,6 +15,7 @@ from utils.print_utils.printer import Printer
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=R0801
+# noinspection DuplicatedCode
 class SecondRewardStrategy(ARewardStrategy):
     """
     This class is an implementation of the ARewardStrategy abstract class.

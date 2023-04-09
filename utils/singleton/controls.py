@@ -78,6 +78,7 @@ class Controls(metaclass=ThreadSafeSingleton):
         tmp_x = Input(ctypes.c_ulong(1), ii_)
         ctypes.windll.user32.SendInput(1, ctypes.pointer(tmp_x), ctypes.sizeof(tmp_x))
 
+    # noinspection PyUnusedLocal
     def press_and_release_key(self, par_hex_key_code: int, par_sleep_time: float = 1,
                               par_can_bypass_critical_check: bool = False) -> bool:
         """
