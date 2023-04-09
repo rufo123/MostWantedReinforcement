@@ -17,6 +17,7 @@ from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStra
 
 
 # pylint: disable=R0801
+# noinspection DuplicatedCode
 class MinimapStateStrategy(AStateCalculationStrategy):
     """
     A state calculation strategy that stores the last five observations and actions in a 5x5 matrix
@@ -27,9 +28,13 @@ class MinimapStateStrategy(AStateCalculationStrategy):
      matrix is then flattened and returned as a Torch Tensor.
 
     Attributes:
-        a_state_matrix (np.ndarray): A 5x5 matrix that stores the last five observations and
-         actions.
+        a_car_state_in_environment (np.ndarray): A object represent car state in environment
     """
+
+    a_car_state_in_environment: CarStateInEnvironment
+
+    def __init__(self):
+        self.a_car_state_in_environment = CarStateInEnvironment()
 
     def calculate_state(self, par_car_state: CarStateInEnvironment,
                         par_action_taken: Union[int, None]) -> torch.Tensor:
@@ -53,7 +58,7 @@ class MinimapStateStrategy(AStateCalculationStrategy):
         """
         normalized_state_values: CarStateInEnvironment = self.normalize_state_values(par_car_state)
 
-        mini_map_resized_2d = numpy.resize(par_car_state.mini_map, (48, 48))
+        mini_map_resized_2d = par_car_state.mini_map
         lap_progress_2d = numpy.full((48, 48),
                                      round(normalized_state_values.lap_progress, ndigits=5), )
         car_speed_2d = numpy.full((48, 48),
@@ -78,6 +83,9 @@ class MinimapStateStrategy(AStateCalculationStrategy):
                 normalized car speed, normalized distance offset, normalized lap progress,
                 and normalized direction offset.
         """
+
+        self.a_car_state_in_environment.reset_car_state()
+
         tmp_car_top_speed: float = 111
         tmp_normalized_speed = par_car_state_not_normalized.speed_mph / tmp_car_top_speed
 
@@ -96,9 +104,11 @@ class MinimapStateStrategy(AStateCalculationStrategy):
 
         tmp_normalized_direction_offset: float = par_car_state_not_normalized.incline_center
 
-        return CarStateInEnvironment(
+        self.a_car_state_in_environment.reset_car_state()
+        self.a_car_state_in_environment.assign_values(
             par_speed_mph=round(tmp_normalized_speed, ndigits=6),
             par_distance_offset_center=round(tmp_normalized_distance_offset, ndigits=6),
             par_lap_progress=round(tmp_normalized_lap_progress, ndigits=5),
-            par_incline_center=tmp_normalized_direction_offset
+            par_incline_center=tmp_normalized_direction_offset,
         )
+        return self.a_car_state_in_environment

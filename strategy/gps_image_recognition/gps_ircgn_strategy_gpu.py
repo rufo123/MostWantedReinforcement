@@ -184,7 +184,7 @@ class GpsImageRecognitionStrategyGPU(AGpsImageRecognitionStrategy):
         tmp_car_offset_dist: float = par_gps.polygon_contour_test(tmp_contour, tmp_car_pos)
 
         tmp_car_directional_offset: int = par_gps.check_direction_point_to_contour(tmp_contour,
-                                                                                        tmp_car_pos)
+                                                                                   tmp_car_pos)
 
         self.a_car_offset = tmp_car_offset_dist
 
