@@ -74,7 +74,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 3370
+        'previous_model_iter_number': 4420
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Printer.print_basic(torch.version.cuda, "MAIN")
@@ -183,11 +183,11 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
 
 if __name__ == '__main__':
-    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
-    #'\\logs_final.txt'), 'avg_score')
-    #graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
-    #'\\logs_final.txt'), 'steps_took')
-    #exit()
+    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    # '\\logs_final.txt'), 'avg_score')
+    # graph.make_graph.scatter_plot_show(os.path.abspath(a_global_settings['path']() + \
+    # '\\logs_final.txt'), 'steps_took')
+    # exit()
 
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()

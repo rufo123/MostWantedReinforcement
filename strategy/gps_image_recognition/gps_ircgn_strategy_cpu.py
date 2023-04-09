@@ -135,6 +135,7 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
             ]
 
         par_gps_greyscale = cv2.resize(par_gps_greyscale, (48, 48))
+
         return par_gps_greyscale
 
     def __show_rectangle_on_image(self, par_image: ndarray, par_coords_x: int,
@@ -215,9 +216,7 @@ class GpsImageRecognitionStrategyCPU(AGpsImageRecognitionStrategy):
         """
 
         # Apply GPS mask to screenshot
-
         par_gps_mask = cv2.bitwise_and(par_image, par_image, mask=par_gps_mask)
-
         # Convert to HSV and create grayscale mask
         tmp_gps_hsv = cv2.cvtColor(par_gps_mask, cv2.COLOR_BGR2HSV)
 

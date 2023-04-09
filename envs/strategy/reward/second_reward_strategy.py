@@ -13,7 +13,7 @@ from envs.strategy.reward.a_reward_strategy import ARewardStrategy
 from utils.print_utils.printer import Printer
 
 
-#pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods
 # pylint: disable=R0801
 class SecondRewardStrategy(ARewardStrategy):
     """

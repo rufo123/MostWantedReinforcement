@@ -315,11 +315,15 @@ class Game:
                     self.a_revolutions_per_minute.return_revolutions_per_minute()
             tmp_gps_cropped_greyscale: Optional[ndarray] = None
             if par_enabled_game_api_values.enabled_mini_map:
-                tmp_gps_cropped_greyscale = \
-                    self.a_gps_img_rcg_strategy.get_half_gps_greyscale(self.a_screenshot,
-                                                                       grayscale_image,
-                                                                       gps_mask, gps_center,
-                                                                       gps_size)
+                while tmp_gps_cropped_greyscale is None:
+                    tmp_gps_cropped_greyscale = \
+                        self.a_gps_img_rcg_strategy.get_half_gps_greyscale(
+                            self.a_screenshot,
+                            grayscale_image,
+                            gps_mask,
+                            gps_center,
+                            gps_size
+                        )
             tmp_car_offset_distance: float = -1
             tmp_car_offset_direction: int = -1
             tmp_contour: Optional[list] = None

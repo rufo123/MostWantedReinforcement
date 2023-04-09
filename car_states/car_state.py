@@ -89,6 +89,17 @@ class CarState:
         self._wrong_way_indicator = -1
         self._mini_map = None
 
+    def has_non_default_values(self) -> bool:
+        """
+        Returns True if at least one attribute of the given CarState object has a non-default value,
+        and False otherwise.
+        """
+        for attr in ['_speed_mph', '_distance_offset_center', '_lap_progress', '_incline_center',
+                     '_revolutions_per_minute', '_wrong_way_indicator', '_mini_map']:
+            if getattr(self, attr) != -1 and getattr(self, attr) is not None:
+                return True
+        return False
+
     @property
     def speed_mph(self) -> float:
         """The current speed of the car in miles per hour."""

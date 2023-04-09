@@ -94,6 +94,8 @@ class Env:
             Printer.print_info("Waiting for Game API to send data (Make_State)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
+        while not tmp_car_state_from_game.has_non_default_values():
+            tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
 
         state = self.a_state_calculation_strategy.calculate_state(
             par_action_taken=-1,
@@ -114,6 +116,7 @@ class Env:
         self.a_lap_percent_curr = 0.00
         self.controls.release_all_keys()
         self.controls.reset_directional_controls()
+        self.a_edited_car_state.reset_car_state()
         state, _, _ = self.make_state()
 
         tmp_queue_game_inputs: multiprocessing.Queue = \
@@ -130,7 +133,6 @@ class Env:
             time.sleep(1)
         self.a_step_counter = 0
         self.controls.a_is_executing_critical_action = False
-        self.a_edited_car_state.reset_car_state()
         return state
 
     def get_lap_progress_dif(self, par_lap_progress: float) -> float:
@@ -179,6 +181,8 @@ class Env:
             Printer.print_info("Waiting for Game API to send data (Step)", "ENV")
             time.sleep(1 / (self.a_game_speed * 2))
         tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
+        while not tmp_car_state_from_game.has_non_default_values():
+            tmp_car_state_from_game: CarState = self.a_game_inputs.agent_inputs_state.get()
 
         tmp_lap_progress_diff: float = \
             self.get_lap_progress_dif(tmp_car_state_from_game.lap_progress)
