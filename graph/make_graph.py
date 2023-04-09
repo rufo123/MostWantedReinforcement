@@ -13,6 +13,7 @@ def scatter_plot_show(par_from_filepath: str, par_column: str):
 
     Args:
         par_from_filepath (str): Filepath to the CSV file to plot.
+        par_column (str): Specified which column to show in graph
     """
     d_f = pd.read_csv(par_from_filepath)
 
