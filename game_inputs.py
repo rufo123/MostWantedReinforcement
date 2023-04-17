@@ -24,12 +24,15 @@ class GameInputs:
     __a_game_initialization_inputs: mp.Queue
     # Inputs Given If Restart is Needed
     __a_game_restart_inputs: mp.Queue
+    # Settings from Agent to Game
+    __a_agent_settings_to_game: mp.Queue
 
     def __init__(self, par_agent_inputs_state: mp.Queue, par_game_initialization_inputs: mp.Queue,
-                 par_game_restart_inputs: mp.Queue):
+                 par_game_restart_inputs: mp.Queue, par_agent_settings_to_game: mp.Queue):
         self.__a_agent_inputs_state = par_agent_inputs_state
         self.__a_game_initialization_inputs = par_game_initialization_inputs
         self.__a_game_restart_inputs = par_game_restart_inputs
+        self.__a_agent_settings_to_game = par_agent_settings_to_game
 
     @property
     def agent_inputs_state(self) -> mp.Queue:
@@ -60,3 +63,13 @@ class GameInputs:
             mp.Queue: The queue containing the inputs.
         """
         return self.__a_game_restart_inputs
+
+    @property
+    def agent_settings_to_game(self) -> mp.Queue:
+        """
+        Gets the settings given by agent to a game
+
+        Returns:
+            mp.Queue: The queue containing the settings.
+        """
+        return self.__a_agent_settings_to_game

@@ -48,7 +48,7 @@ class SixthExperimentMinimap(IConfiguration):
             )
         )
 
-    def return_reward_strategy(self) -> ARewardStrategy:
+    def return_reward_strategy(self, par_iteration_number=0) -> ARewardStrategy:
         """
         Returns an instance of `ARewardStrategy` that is used to calculate the rewards in the
          reinforcement learning algorithm for the sixth experiment.
@@ -56,11 +56,15 @@ class SixthExperimentMinimap(IConfiguration):
         Returns:
             ARewardStrategy: An instance of `ARewardStrategy`.
         """
-        return self.a_configuration_factory.create_reward_strategy(
-            RewardStrategyEnum.FIFTH_REWARD_STRATEGY
+        return self.a_configuration_factory.create_dynamic_reward_strategy(
+            [1680, 5110, 10770],
+            [RewardStrategyEnum.FOURTH_MINIMAP_10_PERCENT,
+             RewardStrategyEnum.FOURTH_MINIMAP_20_PERCENT,
+             RewardStrategyEnum.FOURTH_MINIMAP_40_PERCENT],
+            par_iteration_number
         )
 
-    def return_state_calc_strategy(self) -> AStateCalculationStrategy:
+    def return_state_calc_strategy(self, par_iteration_number=0) -> AStateCalculationStrategy:
         """
         Returns an instance of `AStateCalculationStrategy` that is used to calculate the state
          representation for the reinforcement learning algorithm for the sixth experiment.
@@ -68,8 +72,10 @@ class SixthExperimentMinimap(IConfiguration):
         Returns:
             AStateCalculationStrategy: An instance of `AStateCalculationStrategy`.
         """
-        return self.a_configuration_factory.create_state_calc_strategy(
-            StateStrategyEnum.MINIMAP_STATE_STRATEGY
+        return self.a_configuration_factory.create_dynamic_state_calc_strategy(
+            [1680, 5110],
+            [StateStrategyEnum.MINIMAP_STATE_STRATEGY,
+             StateStrategyEnum.MINIMAP_STATE_NORMALIZED_STRATEGY]
         )
 
     def return_enabled_game_api_values(self) -> EnabledGameApiValues:
@@ -100,3 +106,21 @@ class SixthExperimentMinimap(IConfiguration):
 
     def return_name(self) -> str:
         return "experiment_mini_map"
+
+    def return_max_speed_non_visualised(self) -> int:
+        """
+        Return the maximum speed for the non-visualized experiment - 3.
+
+        Returns:
+            int: The maximum speed for the non-visualized experiment - 3.
+        """
+        return 6
+
+    def return_max_speed_visualised(self) -> int:
+        """
+        Return the maximum speed for the visualized experiment - 3.
+
+        Returns:
+            int: The maximum speed for the visualized experiment - 3.
+        """
+        return 3

@@ -51,7 +51,10 @@ def game_loop_thread(par_game_inputs: GameInputs) -> None:
         tmp_game.main_loop(
             par_game_inputs=par_game_inputs,
             par_results_path=results_path,
-            par_enabled_game_api_values=selected_configuration.return_enabled_game_api_values()
+            par_enabled_game_api_values=selected_configuration.return_enabled_game_api_values(),
+            par_max_speed_with_visualiser=selected_configuration.return_max_speed_visualised(),
+            par_max_speed_without_visualiser=
+            selected_configuration.return_max_speed_non_visualised(),
         )
     except Exception as exception:
         Printer.print_error("An error occurred in Game Api", "MAIN", exception)
@@ -74,7 +77,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
     settings = {
         'create_scatter_plot': False,
         'load_previous_model': True,
-        'previous_model_iter_number': 4420
+        'previous_model_iter_number': 8000
     }
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     Printer.print_basic(torch.version.cuda, "MAIN")
@@ -86,9 +89,7 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
 
     env_param = (
         par_game_inputs,
-        selected_configuration.return_reward_strategy(),
-        selected_configuration.return_state_calc_strategy(),
-        selected_configuration.return_enabled_game_api_values()
+        selected_configuration
     )
 
     count_of_iterations = 20000
@@ -140,20 +141,12 @@ def agent_loop(par_game_inputs: GameInputs) -> None:
         pass
     results_time = ''
 
-    tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
-
-    tmp_is_game_started: bool = tmp_game_variables[0]
-
-    par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
+    tmp_is_game_started: bool = par_game_inputs.game_initialization_inputs.get()
 
     while not tmp_is_game_started:
         Printer.print_info("Waiting for Race to Initialise", "MAIN")
 
-        tmp_game_variables: tuple = par_game_inputs.game_initialization_inputs.get()
-
-        tmp_is_game_started: bool = tmp_game_variables[0]
-
-        par_game_inputs.game_initialization_inputs.put(tmp_game_variables)
+        tmp_is_game_started: bool = par_game_inputs.game_initialization_inputs.get()
 
     time.sleep(1)
 
@@ -192,11 +185,13 @@ if __name__ == '__main__':
     tmp_queue_env_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_game_started_inputs: multiprocessing.Queue = multiprocessing.Queue()
     tmp_queue_restart_game_input: multiprocessing.Queue = multiprocessing.Queue()
+    tmp_queue_agent_settings_to_game: multiprocessing.Queue = multiprocessing.Queue()
 
     game_inputs: GameInputs = GameInputs(
         tmp_queue_env_inputs,
         tmp_queue_game_started_inputs,
-        tmp_queue_restart_game_input
+        tmp_queue_restart_game_input,
+        tmp_queue_agent_settings_to_game,
     )
 
     tmp_game_thread = multiprocessing.Process(target=game_loop_thread, args=(game_inputs,))

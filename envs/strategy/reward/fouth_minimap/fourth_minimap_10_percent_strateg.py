@@ -15,7 +15,7 @@ from utils.print_utils.printer import Printer
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=R0801
-class FifthRewardStrategy(ARewardStrategy):
+class FourthMinimap10PercentRewardStrategy(ARewardStrategy):
     """
     This class is an implementation of the ARewardStrategy abstract class.
     This implementation gives:
@@ -70,12 +70,12 @@ class FifthRewardStrategy(ARewardStrategy):
         reward += self.__lap_progress_reward(par_env_inputs.lap_progress_difference,
                                              tmp_normalization_value)
 
-        if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 20:
+        if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
                 Printer.print_info("Exceeded Step Limit", "FOURTH_REWARD_STRATEGY", )
-                reward += ((par_env_inputs.lap_progress / 10) - 1)
-            if par_env_inputs.lap_progress >= 20:
+                reward += ((par_env_inputs.lap_progress / 5) - 1)
+            if par_env_inputs.lap_progress >= 10:
                 reward += 1
                 Printer.print_success("Lap Complete", "FOURTH_REWARD_STRATEGY")
             Printer.print_info("TERMINAL STATE ACHIEVED", "FOURTH_REWARD_STRATEGY")

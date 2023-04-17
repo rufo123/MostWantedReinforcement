@@ -25,21 +25,25 @@ class IConfiguration(ABC):
         """
 
     @abstractmethod
-    def return_reward_strategy(self) -> ARewardStrategy:
+    def return_reward_strategy(self, par_iteration_number=0) -> ARewardStrategy:
         """
         Return an instance of ARewardStrategy.
 
         Returns:
             ARewardStrategy: An instance of ARewardStrategy.
+            par_iteration_number: A optional value to set dynamic reward strategies based on
+                current iteration number
         """
 
     @abstractmethod
-    def return_state_calc_strategy(self) -> AStateCalculationStrategy:
+    def return_state_calc_strategy(self, par_iteration_number=0) -> AStateCalculationStrategy:
         """
         Return an instance of AStateCalculationStrategy.
 
         Returns:
             AStateCalculationStrategy: An instance of AStateCalculationStrategy.
+            par_iteration_number: A optional value to set dynamic state calc strategies based on
+                current iteration number
         """
 
     @abstractmethod
@@ -67,4 +71,22 @@ class IConfiguration(ABC):
     
           Returns:
               tuple: a dimensional input for the experiment.
+        """
+
+    @abstractmethod
+    def return_max_speed_non_visualised(self) -> int:
+        """
+        Return the maximum speed for the non-visualized experiment.
+
+        Returns:
+            int: The maximum speed for the non-visualized experiment.
+        """
+
+    @abstractmethod
+    def return_max_speed_visualised(self) -> int:
+        """
+        Return the maximum speed for the visualized experiment.
+
+        Returns:
+            int: The maximum speed for the visualized experiment.
         """

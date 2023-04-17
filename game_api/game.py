@@ -78,50 +78,38 @@ class Game:
     a_gps: GPS
 
     a_speedometer: Speedometer
-
     a_lap_progress: LapProgress
-
     a_lap_time: LapTime
-
     a_revolutions_per_minute: RevolutionsPerMinute
-
     a_wrong_way: WrongWay
 
     a_is_recording: bool
 
     a_user23 = ctypes.windll.user32
-
     a_list_bitmap: []
-
     a_controls: Controls
-
     a_font_settings: FontSettings
-
     a_speed: int
-
     a_car_distance_offset: float
-
     a_car_direction_offset: int
-
     a_race_initialised: bool
-
     a_cycles_passed: int
-
     a_cuda_device: None
 
     a_gps_img_rcg_strategy: AGpsImageRecognitionStrategy
-
     a_gps_strategy_enum: GPSStrategyEnum
-
     a_cheat_engine: CheatEngine
-
     a_image_manipulation: ImageManipulation
 
     a_dictionary_menus: dict[str, str]
-
     a_enabled_game_api_values: EnabledGameApiValues
-
     a_car_state: CarState
+
+    a_speed_with_visualiser: int
+    a_speed_without_visualiser: int
+
+    a_hwnd: None
+    a_visualise: bool
 
     def __init__(self) -> None:
         self.a_image_manipulation = ImageManipulation()
@@ -132,7 +120,7 @@ class Game:
         self.a_cycles_passed = 0
         self.a_cheat_engine = CheatEngine()
         self.a_list_bitmap = []
-        self.a_speed = 3
+        self.a_speed = 6
         self.a_controls = Controls()
         self.a_font_settings = FontSettings(
             par_font=cv2.FONT_HERSHEY_SIMPLEX,
@@ -146,6 +134,7 @@ class Game:
             'standing_menu': 'standings_menu',
             'attention_restart': 'attention_restart'
         }
+        self.a_visualise = True
 
         cuda.printCudaDeviceInfo(0)
 
@@ -177,7 +166,10 @@ class Game:
         self.a_wrong_way.construct()
 
     def initialize_game(self, par_game_inputs: GameInputs,
-                        par_enabled_game_api_values: EnabledGameApiValues) -> None:
+                        par_enabled_game_api_values: EnabledGameApiValues,
+                        par_max_speed_with_visualiser: int,
+                        par_max_speed_without_visualiser: int
+                        ) -> None:
         """
         Initializes the game by starting the game, waiting for it to start, creating and 
             initializing required game objects,and setting the game speed and cheat engine.
@@ -187,12 +179,17 @@ class Game:
                 game inputs.
             par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
                 class containing the enabled game api values. 
+            par_max_speed_with_visualiser (int): max speed multiplier with visualiser enabled
+            par_max_speed_without_visualiser (int): max speed multiplier without visualiser enabled
+
 
         Returns:
             None
         """
         self.a_game_state = GameStateStarting()
         self.a_enabled_game_api_values = par_enabled_game_api_values
+        self.a_speed_with_visualiser = par_max_speed_with_visualiser
+        self.a_speed_without_visualiser = par_max_speed_without_visualiser
         self.start_game()
         # self.start_cheat_engine()
 
@@ -238,18 +235,42 @@ class Game:
         self.a_cycles_passed = 0
 
         par_game_inputs.game_initialization_inputs.put((
+            self.a_race_initialised
+        ))
+
+        agent_settings: tuple[bool, bool] = par_game_inputs.agent_settings_to_game.get()
+
+        self.a_visualise = agent_settings[0]
+
+        # If Not Realtime set speed based on enabled visualiser
+        if not agent_settings[1]:
+            if self.a_visualise:
+                self.a_speed = self.a_speed_with_visualiser
+            else:
+                self.a_speed = self.a_speed_without_visualiser
+        # If Realtime set speed to 1
+        else:
+            self.a_speed = 1
+
+        par_game_inputs.game_initialization_inputs.put((
             self.a_race_initialised,
             self.a_speed
         ))
+
+        self.a_cheat_engine.reconfigure_speed(self.a_speed)
 
         self.a_car_state = self.create_empty_car_state()
 
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-statements
+    # pylint: disable=too-many-arguments
     def main_loop(self, par_game_inputs: GameInputs,
                   par_results_path: str,
-                  par_enabled_game_api_values: EnabledGameApiValues):
+                  par_enabled_game_api_values: EnabledGameApiValues,
+                  par_max_speed_with_visualiser: int,
+                  par_max_speed_without_visualiser: int
+                  ):
         """
         Main Loop That Controls All The Game Logic
 
@@ -259,12 +280,17 @@ class Game:
             par_results_path (str): Path of the folder containing results including graph images
             par_enabled_game_api_values (EnabledGameApiValues): an instance of EnabledGameApiValues
                 class containing the enabled game api values. 
+            par_max_speed_with_visualiser (int): max speed multiplier with visualiser enabled
+            par_max_speed_without_visualiser (int): max speed multiplier without visualiser enabled
 
         Returns:
             None: This method doesn't return anything.
         """
 
-        self.initialize_game(par_game_inputs, par_enabled_game_api_values)
+        self.initialize_game(par_game_inputs,
+                             par_enabled_game_api_values,
+                             par_max_speed_with_visualiser,
+                             par_max_speed_without_visualiser)
 
         tmp_start_time = time.time()
         tmp_speed_constant = 1 / self.a_speed
@@ -276,7 +302,7 @@ class Game:
             try:
                 tmp_wrong_way_value = self.a_wrong_way.return_is_wrong_way()
             # pylint: disable=broad-except
-            except Exception as exception:
+            except pymem.exception.MemoryReadError as exception:
                 Printer.print_info(f"Waiting for pointers to initialize {exception}", "GAME")
                 time.sleep(1)
 
@@ -287,10 +313,12 @@ class Game:
 
             self.a_car_state.reset_car_state()
 
-            # Check for quit key -> !! WARNING - Without this all the windows will be BLANK GREY !!!
-            if cv2.waitKey(1) == ord('q'):
-                cv2.destroyAllWindows()
-                break
+            if self.a_visualise:
+                # Check for quit key -> !! WARNING - Without this all the windows will be
+                # BLANK GREY !!!
+                if cv2.waitKey(1) == ord('q'):
+                    cv2.destroyAllWindows()
+                    break
 
             # Check for record key
             if keyboard.is_pressed('r'):
@@ -340,11 +368,12 @@ class Game:
             self.a_car_distance_offset = tmp_car_offset_distance
             self.a_car_direction_offset = tmp_car_offset_direction
 
-            if tmp_contour is not None:
+            if tmp_contour is not None and self.a_visualise:
                 cv2.drawContours(self.a_screenshot, [tmp_contour], -1, (255, 0, 255), -1)
 
             backup_screenshot: ndarray = self.a_screenshot
-            self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
+            if self.a_visualise:
+                self.show_graph(par_image_path=par_results_path + 'scatter_plot.png')
 
             tmp_frame_counter += tmp_speed_constant
 
@@ -359,7 +388,8 @@ class Game:
                 tmp_needs_restart: bool = par_game_inputs.game_restart_inputs.get()
                 if tmp_needs_restart:
                     self.a_game_state = GameStateRestarting()
-                    self.update_state_on_screen(self.a_screenshot)
+                    if self.a_visualise:
+                        self.update_state_on_screen(self.a_screenshot)
 
                     par_game_inputs.game_restart_inputs.put(tmp_needs_restart)
                     self.reset_game_race(0.7 / float(self.a_speed), 0.01 / float(self.a_speed))
@@ -387,16 +417,16 @@ class Game:
             )
 
             par_game_inputs.agent_inputs_state.put(self.a_car_state, )
+            if self.a_visualise:
+                self.show_texts_on_image(par_image=backup_screenshot,
+                                         par_font_color=(159, 43, 104),
+                                         par_car_state=self.a_car_state
+                                         )
 
-            self.show_texts_on_image(par_image=backup_screenshot,
-                                     par_font_color=(159, 43, 104),
-                                     par_car_state=self.a_car_state
-                                     )
+                self.show_state_on_image(par_image=backup_screenshot,
+                                         par_game_state=self.a_game_state)
 
-            self.show_state_on_image(par_image=backup_screenshot,
-                                     par_game_state=self.a_game_state)
-
-            cv2.imshow('Main Vision', backup_screenshot)
+                cv2.imshow('Main Vision', backup_screenshot)
 
     def is_race_initialised(self) -> bool:
         """
@@ -633,8 +663,10 @@ class Game:
                - int: Width of the captured image
                - int: Height of the captured image
         """
-        # Find the game window
+        # Find the game window4
         hwnd = win32gui.FindWindow(None, self.api_settings['game_title_name'])
+
+        # win32gui.SendMessage(hwnd, win32con.WM_ACTIVATE, win32con.WA_CLICKACTIVE, hwnd)
 
         # Get the window device context
         w_dc = win32gui.GetWindowDC(hwnd)
@@ -831,7 +863,8 @@ class Game:
 
         return RestartStateEnum.UNKNOWN_STATE
 
-    def reset_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float) -> None:
+    def reset_game_race(self, par_sleep_time_delay: float,
+                        par_sleep_time_key_press: float) -> None:
         """
         Reset the game race to the initial state.
 
@@ -872,7 +905,8 @@ class Game:
             # Press Enter - Restarts The Race
             # Then Prompt Will Appear - We Move To The OK Button
             for key_to_press in keys_to_press:
-                self.a_controls.press_and_release_key(key_to_press, par_sleep_time_key_press, True)
+                self.a_controls.press_and_release_key(key_to_press,
+                                                      par_sleep_time_key_press, True)
                 time.sleep(par_sleep_time_delay)
 
             tmp_restart_state = self.is_in_correct_restart_state(self.window_capture()[0])
@@ -887,12 +921,14 @@ class Game:
         # If the prompt with Attention (Do you Really Want to Restart) appears press Enter
         time.sleep(par_sleep_time_delay)
 
-        self.a_controls.press_and_release_key(self.a_controls.ENTER, par_sleep_time_key_press, True)
+        self.a_controls.press_and_release_key(self.a_controls.ENTER,
+                                              par_sleep_time_key_press, True)
         time.sleep(par_sleep_time_delay)
 
         time.sleep(1 * self.a_speed)
 
-    def init_game_race(self, par_sleep_time_delay: float, par_sleep_time_key_press: float):
+    def init_game_race(self,
+                       par_sleep_time_delay: float, par_sleep_time_key_press: float):
         """
         Initializes a race in the game by navigating through the game's menu system.
 
