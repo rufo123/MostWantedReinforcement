@@ -36,6 +36,42 @@ class ConfigurationFactory:
         """
         return par_reward_strategy.return_strategy()
 
+    def create_dynamic_reward_strategy(self,
+                                       par_border_iteration_numbers: list[int],
+                                       par_reward_strategies: list[RewardStrategyEnum],
+                                       par_iteration_number: int = 0):
+        """
+        Creates a dynamic reward strategy for the reinforcement learning agent based on the
+         position of iteration number
+        in the par_border_iteration_numbers list.
+
+        Args:
+        - par_border_iteration_numbers (list[int]): A list of border iteration numbers.
+        - par_reward_strategies (list[RewardStrategyEnum]): A list of reward strategies.
+
+        Returns:
+        - ARewardStrategy: An object that implements the dynamic reward strategy.
+        """
+        # Check if the lengths of the input lists match
+        if len(par_border_iteration_numbers) != len(par_reward_strategies):
+            raise ValueError(
+                "Length of border iteration numbers list does"
+                " not match length of reward strategies list.")
+
+        # Get the current iteration number
+        current_iteration = par_iteration_number
+
+        # Iterate through the border iteration numbers list and compare with current iteration
+        # number
+        for border_iteration, reward_strategy in zip(par_border_iteration_numbers,
+                                                     par_reward_strategies):
+            if current_iteration < border_iteration:
+                return reward_strategy.return_strategy()
+
+        # If current iteration number is greater than all border iteration numbers,
+        # return the last reward strategy
+        return par_reward_strategies[-1].return_strategy()
+
     def create_state_calc_strategy(
             self,
             par_state_calc_strategy: StateStrategyEnum
@@ -48,6 +84,42 @@ class ConfigurationFactory:
         :return: An object that implements the state calculation strategy.
         """
         return par_state_calc_strategy.return_strategy()
+
+    def create_dynamic_state_calc_strategy(self,
+                                           par_border_iteration_numbers: list[int],
+                                           par_state_calc_strategies: list[StateStrategyEnum],
+                                           par_iteration_number: int = 0):
+        """
+        Creates a dynamic state clac strategy for the reinforcement learning agent based on the
+         position of iteration number
+        in the par_state_calc_strategies list.
+
+        Args:
+        - par_border_iteration_numbers (list[int]): A list of border iteration numbers.
+        - par_state_calc_strategies (list[StateStrategyEnum]): A list of state calc strategies.
+
+        Returns:
+        - ARewardStrategy: An object that implements the dynamic reward strategy.
+        """
+        # Check if the lengths of the input lists match
+        if len(par_border_iteration_numbers) != len(par_state_calc_strategies):
+            raise ValueError(
+                "Length of border iteration numbers list does"
+                " not match length of reward strategies list.")
+
+        # Get the current iteration number
+        current_iteration = par_iteration_number
+
+        # Iterate through the border iteration numbers list and compare with current iteration
+        # number
+        for border_iteration, reward_strategy in zip(par_border_iteration_numbers,
+                                                     par_state_calc_strategies):
+            if current_iteration < border_iteration:
+                return reward_strategy.return_strategy()
+
+        # If current iteration number is greater than all border iteration numbers,
+        # return the last reward strategy
+        return par_state_calc_strategies[-1].return_strategy()
 
     def create_dimensional_input(self, par_input_dim: Union[tuple, int] = 4) -> tuple:
         """

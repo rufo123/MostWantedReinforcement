@@ -46,6 +46,7 @@ class ActionTranslatorEnum(Enum):
         Returns:
           - The integer value of the action taken.
           """
+        print(par_sleep_time)
         executed_correctly: bool = False
         action = self.value
         par_controls.release_all_keys()

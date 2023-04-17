@@ -81,7 +81,7 @@ class CarStateInEnvironment(CarState):
              car.
             par_revolutions_per_minute (float): The number of revolutions of the car's engine per
              minute.
-            par_wrong_way_indicator (int): A binary indicator (0 or 1) that shows if the car is
+            par_wrong_way_indicator (float): A binary indicator (0 or 1) that shows if the car is
              going the wrong way.
             par_mini_map (numpy.ndarray): A 2D array that represents the mini-map of the track.
             par_car_state (CarState): An instance of the parent class `CarState` to copy values

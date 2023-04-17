@@ -17,9 +17,7 @@ import torch.nn.functional as F
 from torch.multiprocessing import Process, Pipe
 
 import graph.make_graph
-from car_states.enabled_game_api_values import EnabledGameApiValues
-from envs.strategy.reward.a_reward_strategy import ARewardStrategy
-from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStrategy
+from configuration.i_configuration import IConfiguration
 from game_inputs import GameInputs
 from utils.print_utils.printer import Printer
 from utils.stats import MovingAverageScore, write_to_file, append_to_file
@@ -82,7 +80,7 @@ def scalar_to_support(par_x, par_support_size):
 # pylint: disable=too-many-statements
 # noinspection DuplicatedCode
 def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
-           count_of_steps, gamma, gae_lambda) -> None:
+           count_of_steps, gamma, gae_lambda, start_iteration_number) -> None:
     """
     worker function for Proximal Policy Optimization (PPO) agent training.
 
@@ -100,7 +98,9 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
     None.
     """
     envs = [env_func(*env_param) for _ in range(count_of_envs)]
-    observations = torch.stack([torch.from_numpy(env.reset()) for env in envs])
+    observations = torch.stack([torch.from_numpy(
+        env.reset(start_iteration_number)
+    ) for env in envs])
     game_score = np.zeros(count_of_envs)
     steps_taken_storage = np.zeros(count_of_steps)
 
@@ -141,7 +141,7 @@ def worker(connection, env_param, env_func, count_of_iterations, count_of_envs,
                     game_score[idx] = 0
                     steps_taken_storage[idx] = steps_took_to_complete
                     steps_taken_list.append(steps_taken_storage[idx])
-                    observation = envs[idx].reset()
+                    observation = envs[idx].reset(start_iteration_number + iteration)
                 # observations[idx] = observation.clone().detach()
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -219,9 +219,7 @@ class Agent:
     # pylint: disable=too-many-locals
     # pylint: disable=too-many-statements
     def train(self,
-              env_param: tuple[GameInputs, ARewardStrategy,
-              AStateCalculationStrategy, EnabledGameApiValues
-              ],
+              env_param: tuple[GameInputs, IConfiguration],
               env_func, count_of_actions,
               count_of_iterations=10000, count_of_processes=2,
               count_of_envs=16, count_of_steps=128, count_of_epochs=4,
@@ -267,7 +265,8 @@ class Agent:
             parr_connection, child_connection = Pipe()
             process = Process(target=worker, args=(
                 child_connection, env_param, env_func, count_of_iterations,
-                count_of_envs, count_of_steps, self.gamma, self.gae_lambda))
+                count_of_envs, count_of_steps, self.gamma, self.gae_lambda,
+                self.start_iteration_value))
             connections.append(parr_connection)
             processes.append(process)
             process.start()

@@ -9,6 +9,8 @@ from envs.strategy.state_calc.a_state_calc_strategy import AStateCalculationStra
 from envs.strategy.state_calc.basic_state_strategy import BasicStateStrategy
 from envs.strategy.state_calc.bigger_state_normalized_strategy import BiggerStateNormalizedStrategy
 from envs.strategy.state_calc.bigger_state_strategy import BiggerStateStrategy
+from envs.strategy.state_calc.minimap_state_normalized_strategy import \
+    MinimapStateNormalizedStrategy
 from envs.strategy.state_calc.minimap_state_strategy import MinimapStateStrategy
 
 
@@ -20,6 +22,7 @@ class StateStrategyEnum(Enum):
     BIGGER_STATE_STRATEGY = 1
     BIGGER_STATE_STRATEGY_NORMALIZED = 2
     MINIMAP_STATE_STRATEGY = 3
+    MINIMAP_STATE_NORMALIZED_STRATEGY = 4
 
     def return_strategy(self) -> AStateCalculationStrategy:
         """
@@ -41,7 +44,8 @@ class StateStrategyEnum(Enum):
             self.BASIC_STATE_STRATEGY: BasicStateStrategy(),
             self.BIGGER_STATE_STRATEGY: BiggerStateStrategy(),
             self.BIGGER_STATE_STRATEGY_NORMALIZED: BiggerStateNormalizedStrategy(),
-            self.MINIMAP_STATE_STRATEGY: MinimapStateStrategy()
+            self.MINIMAP_STATE_STRATEGY: MinimapStateStrategy(),
+            self.MINIMAP_STATE_NORMALIZED_STRATEGY: MinimapStateNormalizedStrategy()
         }
 
         try:

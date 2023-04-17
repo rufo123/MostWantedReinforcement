@@ -44,7 +44,7 @@ class FourthExperimentLapTerminalScaledReward(IConfiguration):
             )
         )
 
-    def return_reward_strategy(self) -> ARewardStrategy:
+    def return_reward_strategy(self, par_iteration_number=0) -> ARewardStrategy:
         """
         Returns an instance of `ARewardStrategy` that is used to calculate the rewards in the
          reinforcement learning algorithm for the fourth experiment.
@@ -56,7 +56,7 @@ class FourthExperimentLapTerminalScaledReward(IConfiguration):
             RewardStrategyEnum.SECOND_REWARD_STRATEGY
         )
 
-    def return_state_calc_strategy(self) -> AStateCalculationStrategy:
+    def return_state_calc_strategy(self, par_iteration_number=0) -> AStateCalculationStrategy:
         """
         Returns an instance of `AStateCalculationStrategy` that is used to calculate the state
          representation for the reinforcement learning algorithm for the fourth experiment.
@@ -96,3 +96,21 @@ class FourthExperimentLapTerminalScaledReward(IConfiguration):
 
     def return_name(self) -> str:
         return "experiment_partial_terminal_lap"
+
+    def return_max_speed_non_visualised(self) -> int:
+        """
+        Return the maximum speed for the non-visualized experiment - 3.
+
+        Returns:
+            int: The maximum speed for the non-visualized experiment - 3.
+        """
+        return 3
+
+    def return_max_speed_visualised(self) -> int:
+        """
+        Return the maximum speed for the visualized experiment - 3.
+
+        Returns:
+            int: The maximum speed for the visualized experiment - 3.
+        """
+        return 3

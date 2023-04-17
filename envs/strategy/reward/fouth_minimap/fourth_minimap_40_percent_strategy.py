@@ -15,19 +15,16 @@ from utils.print_utils.printer import Printer
 
 # pylint: disable=too-few-public-methods
 # pylint: disable=R0801
-class FourthRewardStrategy(ARewardStrategy):
+class FourthMinimap40PercentRewardStrategy(ARewardStrategy):
     """
     This class is an implementation of the ARewardStrategy abstract class.
     This implementation gives:
      - positive reward for:
-        Offset (Distance From Road Centre): <0, 1> and <-1, 0>
-
-        Completing The Race (Partially - 10%)
+        Completing The Race (Partially - 40%)
 
      - negative reward for:
-        Offset (Distance From Road Centre): (-10, -1> and (-inf, -10> 
-
         Not Completing The Race in specified count_of_steps
+        
     """
 
     # noinspection DuplicatedCode
@@ -70,12 +67,12 @@ class FourthRewardStrategy(ARewardStrategy):
         reward += self.__lap_progress_reward(par_env_inputs.lap_progress_difference,
                                              tmp_normalization_value)
 
-        if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 10:
+        if par_env_steps_counter >= par_game_steps_per_episode or par_env_inputs.lap_progress >= 40:
             terminal = True
             if par_env_steps_counter >= par_game_steps_per_episode:
                 Printer.print_info("Exceeded Step Limit", "FOURTH_REWARD_STRATEGY", )
-                reward += ((par_env_inputs.lap_progress / 5) - 1)
-            if par_env_inputs.lap_progress >= 10:
+                reward += ((par_env_inputs.lap_progress / 20) - 1)
+            if par_env_inputs.lap_progress >= 40:
                 reward += 1
                 Printer.print_success("Lap Complete", "FOURTH_REWARD_STRATEGY")
             Printer.print_info("TERMINAL STATE ACHIEVED", "FOURTH_REWARD_STRATEGY")
